@@ -401,6 +401,34 @@ void sys_utilities(char* utilityName, int value)
 		uint32* isOPTRepl = (uint32*) value ;
 		*isOPTRepl = isPageReplacmentAlgorithmOPTIMAL();
 	}
+	else if (strcmp(utilityName, "__CheckUserKernStack__") == 0)
+	{
+		uint32* correct = (uint32*) value ;
+		*correct = 1;
+		struct Env *e = get_cpu_proc();
+		uint32 kstackBottom = (uint32)e->kstack;
+		uint32 kstackTop = kstackBottom + KERNEL_STACK_SIZE;
+
+		for (uint32 va = kstackBottom; va < kstackTop ; va+=PAGE_SIZE)
+		{
+			uint32 *ptrTable;
+			struct FrameInfo *ptrFI = get_frame_info(e->env_page_directory, va, &ptrTable);
+			//Check Guard Page
+			if (va == kstackBottom && (ptrTable[PTX(va)] & PERM_PRESENT) != 0)
+			{
+				cprintf_colored(TEXT_TESTERR_CLR, "User Kern Stack ERROR#1: guard page is not set correctly\n");
+				*correct = 0;
+				break;
+			}
+			else if (ptrFI == NULL)
+			{
+				cprintf_colored(TEXT_TESTERR_CLR, "User Kern Stack ERROR#2: page is not set correctly\n");
+				*correct = 0;
+				break;
+			}
+		}
+	}
+
 	if ((int)value < 0)
 	{
 		if (strcmp(utilityName, "__ReplStrat__") == 0)

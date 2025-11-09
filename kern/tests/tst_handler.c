@@ -390,14 +390,14 @@ int tst_kheap(int number_of_arguments, char **arguments)
 		cprintf("Invalid number of arguments! USAGE: tst kheap <Strategy> kfree <both or blk or page>\n") ;
 		return 0;
 	}
-	else if (strcmp(arguments[2], "kvirtaddr") == 0 && number_of_arguments != 2)
+	else if (strcmp(arguments[2], "kvirtaddr") == 0 && number_of_arguments != 3)
 	{
-		cprintf("Invalid number of arguments! USAGE: tst kheap kvirtaddr\n") ;
+		cprintf("Invalid number of arguments! USAGE: tst kheap <Strategy> kvirtaddr\n") ;
 		return 0;
 	}
-	else if (strcmp(arguments[2], "kphysaddr") == 0 && number_of_arguments != 2)
+	else if (strcmp(arguments[2], "kphysaddr") == 0 && number_of_arguments != 3)
 	{
-		cprintf("Invalid number of arguments! USAGE: tst kheap kphysaddr\n") ;
+		cprintf("Invalid number of arguments! USAGE: tst kheap <Strategy> kphysaddr\n") ;
 		return 0;
 	}
 	else if (strcmp(arguments[2], "krealloc") == 0 && number_of_arguments != 4)
@@ -406,7 +406,7 @@ int tst_kheap(int number_of_arguments, char **arguments)
 		return 0;
 	}
 
-	// Specify Test Type [ig any]
+	// Specify Test Type [if any]
 	uint32 testType = 0;
 	if (number_of_arguments == 4)
 	{
@@ -428,7 +428,6 @@ int tst_kheap(int number_of_arguments, char **arguments)
 			return 0;
 		}
 	}
-
 	// Setting Strategy
 	if(strcmp(arguments[1], "FF") == 0 || strcmp(arguments[1], "ff") == 0)
 	{
@@ -455,6 +454,7 @@ int tst_kheap(int number_of_arguments, char **arguments)
 		set_kheap_strategy(KHP_PLACE_CUSTOMFIT);
 		cprintf("Kernel Heap placement strategy is CUSTOM FIT\n");
 	}
+
 	// Test 1-kmalloc: tst kheap <Strategy> kmalloc <allocator>
 	if(strcmp(arguments[2], "kmalloc") == 0)
 	{
@@ -473,13 +473,15 @@ int tst_kheap(int number_of_arguments, char **arguments)
 		test_kfree(testType);
 		return 0;
 	}
-	// Test 3-kphysaddr: tst kheap kphysaddr
+	// Test 3-kphysaddr: tst kheap <Strategy> kphysaddr
+	// <Strategy> IS NEGLECTED
 	else if(strcmp(arguments[2], "kphysaddr") == 0)
 	{
 		test_kheap_phys_addr();
 		return 0;
 	}
-	// Test 4-kvirtaddr: tst kheap kvirtaddr
+	// Test 4-kvirtaddr: tst kheap <Strategy> kvirtaddr
+	// <Strategy> IS NEGLECTED
 	else if(strcmp(arguments[2], "kvirtaddr") == 0)
 	{
 		test_kheap_virt_addr();

@@ -764,8 +764,17 @@ static int program_segment_alloc_map_copy_workingset(struct Env *e, struct Progr
 
 	*allocated_pages = 0;
 	/*2015*/// Load max of 6 pages only for the segment that start with va = 200000 [EXCEPT tpp]
-	if (iVA == 0x200000 && strcmp(e->prog_name, "tpp")!=0)
-		remaining_ws_pages = remaining_ws_pages < 6 ? remaining_ws_pages:6 ;
+//	if (iVA == 0x200000 && strcmp(e->prog_name, "tpp")!=0)
+//		remaining_ws_pages = remaining_ws_pages < 6 ? remaining_ws_pages:6 ;
+	/*==========================================================================================*/
+	/*2025*/// DON'T Load segment that start with va = 200000 since it's for debugging stab and differ from QMUE to Bochs
+	if (iVA == 0x200000)
+		remaining_ws_pages = 0 ;
+	//In [tpp or tia's]: Load max of 9 pages only for the data segments that start with va = 803000
+	if (iVA == 0x803000 && (strcmp(e->prog_name, "tpp")==0 || strcmp(e->prog_name, "tia") ==0
+			|| strcmp(e->prog_name, "tia_slave1") == 0 || strcmp(e->prog_name, "tia_slave2") == 0
+			|| strcmp(e->prog_name, "tia_slave3") == 0 || strcmp(e->prog_name, "tia_slave4") == 0))
+		remaining_ws_pages = remaining_ws_pages < 9 ? remaining_ws_pages:9;
 	/*==========================================================================================*/
 	for (; iVA < end_vaddr && i<remaining_ws_pages; i++, iVA += PAGE_SIZE)
 	{
