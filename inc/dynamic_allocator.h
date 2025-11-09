@@ -12,6 +12,9 @@
 #define DYN_ALLOC_MIN_BLOCK_SIZE (1<<LOG2_MIN_SIZE)		//8 BYTE
 #define DYN_ALLOC_MAX_BLOCK_SIZE (1<<LOG2_MAX_SIZE) 	//2 KB
 
+// My Defines
+#define NUM_OF_BLOCK_SIZES (LOG2_MAX_SIZE - LOG2_MIN_SIZE + 1)
+
 //[2] Data Structures
 struct BlockElement
 {
@@ -42,8 +45,8 @@ __inline__ struct PageInfoElement * to_page_info(uint32 va);
 
 //KERNEL: implemented inside kern/mem/kheap.c
 //USER: implemented inside kern/mem/uheap.c
-int get_page(void* va);		//get a page from the Kernel Page Allocator for DA (i.e. Allocate it)
-void return_page(void* va);	//return a page from the DA to Kernel Page Allocator (i.e. Free It)
+int get_page(void* va);		// get a page from the Kernel Page Allocator for DA (i.e. Allocate it)
+void return_page(void* va);	// return a page from the DA to Kernel Page Allocator (i.e. Free It)
 //=============================================================================
 
 /*2025*/ //REQUIRED FUNCTIONS
