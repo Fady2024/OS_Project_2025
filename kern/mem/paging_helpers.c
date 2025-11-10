@@ -53,7 +53,13 @@ inline int pt_get_page_permissions(uint32* directory, uint32 virtual_address )
 {
 	//TODO: PRACTICE: fill this function.
 	//Comment the following line
-	panic("pt_get_page_permissions() is not implemented yet!");
+	uint32 *ptr_page_table = NULL;
+	int ret = get_page_table(directory, virtual_address, &ptr_page_table);
+	if (ptr_page_table == NULL || ret == TABLE_NOT_EXIST) return 0;
+	uint32 page_table_entry = ptr_page_table[PTX(virtual_address)];
+	return (int)(page_table_entry & 0xFFF);
+
+//	panic("pt_get_page_permissions() is not implemented yet!");
 }
 
 //===============================

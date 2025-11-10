@@ -38,5 +38,6 @@ unsigned int kheap_physical_address(unsigned int virtual_address);
 
 int numOfKheapVACalls ;
 
+int get_page(void* va);
 
 #endif // FOS_KERN_KHEAP_H_
