@@ -74,9 +74,6 @@ void* kmalloc(unsigned int size)
 
 	uint32 start = 0,end = 0;
 	uint32 exact_s = 0,exact_e=0,worst_s=0,worst_e=0;
-	cprintf("size: %u  -  kheapS: %u  - kheape: %u  \n",size,kheapPageAllocStart,kheapPageAllocBreak);
-	cprintf("%u : %u \n",num_pages,page_size);
-	cprintf("end: %u  -  K: %u \n",kheapPageAllocBreak,KERNEL_HEAP_MAX);
 	for(uint32 i = kheapPageAllocStart; i <kheapPageAllocBreak;i+=PAGE_SIZE){
 		if(page_free(i)){
 			end = i+PAGE_SIZE;
@@ -106,21 +103,20 @@ void* kmalloc(unsigned int size)
 
 	// !exact and !worst
 	if(page_s == 0){
-		cprintf("ana: %u \n",kheapPageAllocBreak);
+//		cprintf("ana: %u \n",kheapPageAllocBreak);
 		if(kheapPageAllocBreak <= KERNEL_HEAP_MAX - page_size){
 
 			page_s = kheapPageAllocBreak;
 			page_e = kheapPageAllocBreak  + page_size;
-			cprintf("ps: %u - pe: %u  - size: %u \n",page_s,page_e,page_size);
+//			cprintf("ps: %u - pe: %u  - size: %u \n",page_s,page_e,page_size);
 			kheapPageAllocBreak = page_e;
-			cprintf("ana2: %u \n",kheapPageAllocBreak);
+//			cprintf("ana2: %u \n",kheapPageAllocBreak);
 		}
 		else return NULL;
 
 	}
-	cprintf("k1: %u \n",kheapPageAllocBreak);
 	for(uint32 i = page_s; i <page_e;i+=PAGE_SIZE) get_page((void*)i);
-	cprintf("k2: %u \n",kheapPageAllocBreak);
+//	cprintf("k2: %u \n",kheapPageAllocBreak);
 	return (void*)page_s;
 
 
