@@ -121,16 +121,19 @@ void* kmalloc(unsigned int size)
 		else return NULL;
 
 	}
-	for(uint32 i = page_s; i <page_e;i+=PAGE_SIZE) get_page((void*)i);
+	for(uint32 i = page_s; i <page_e;i+=PAGE_SIZE){
+		uint32 idx = (i  - kheapPageAllocStart)/PAGE_SIZE;
+		allocs[idx].va = (void*)page_s;
+		allocs[idx].size = page_size;
+		get_page((void*)i);
+	}
 //	cprintf("k2: %u \n",kheapPageAllocBreak);
-	uint32 idx = (page_s  - kheapPageAllocStart)/PAGE_SIZE;
-	allocs[idx].va = (void*)page_s;
-	allocs[idx].size = page_size;
 	return (void*)page_s;
 
 
 
 	//TODO: [PROJECT'25.BONUS#3] FAST PAGE ALLOCATOR
+
 }
 
 //=================================
@@ -144,15 +147,23 @@ void kfree(void* virtual_address)
 	//panic("kfree() is not implemented yet...!!");
 	//cprintf("%u\n", (KERNEL_HEAP_MAX - kheapPageAllocStart) / PAGE_SIZE); // 32766
 	if( (uint32)virtual_address < kheapPageAllocStart)return free_block(virtual_address);
-	uint32 page_start = ((uint32)virtual_address);
 
-	uint32 idx = (page_start - kheapPageAllocStart)/PAGE_SIZE;
+	uint32 idx = (((uint32)virtual_address) - kheapPageAllocStart)/PAGE_SIZE;
+	if(allocs[idx].va == NULL){
+		panic("kfree() in kern: Invalid Address\n");
+	}
+	uint32 page_start = (uint32)allocs[idx].va;
 
 	uint32 sz = allocs[idx].size;
 
 	uint32 page_end = page_start + sz;
 
-	for(uint32 i = page_start;i<page_end;i+=PAGE_SIZE) return_page((void*)i);
+	for(uint32 i = page_start;i<page_end;i+=PAGE_SIZE){
+		uint32 idx = (i  - kheapPageAllocStart)/PAGE_SIZE;
+		allocs[idx].va = NULL;
+		allocs[idx].size = 0;
+		return_page((void*)i);
+	}
 
 	if(kheapPageAllocBreak == page_end){
 		kheapPageAllocBreak-=sz;
@@ -207,5 +218,7 @@ void *krealloc(void *virtual_address, uint32 new_size)
 	//TODO: [PROJECT'25.BONUS#2] KERNEL REALLOC - krealloc
 	//Your code is here
 	//Comment the following line
-	panic("krealloc() is not implemented yet...!!");
+	//panic("krealloc() is not implemented yet...!!");
+	kfree(virtual_address);
+	return kmalloc(new_size);
 }
