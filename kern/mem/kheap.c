@@ -20,8 +20,8 @@ int page_free(uint32 x){
 }
 
 // my st
-struct alloc allocs[MAX_ALLOCS];
-int alloc_count = 0;
+struct alloc allocs[NUM_OF_KHEAP_PAGES];
+
 
 //==============================================
 // [1] INITIALIZE KERNEL HEAP:
@@ -123,9 +123,9 @@ void* kmalloc(unsigned int size)
 	}
 	for(uint32 i = page_s; i <page_e;i+=PAGE_SIZE) get_page((void*)i);
 //	cprintf("k2: %u \n",kheapPageAllocBreak);
-	allocs[alloc_count].va = (void*)page_s;
-	allocs[alloc_count].size = page_size;
-	alloc_count++;
+	uint32 idx = (page_s  - kheapPageAllocStart)/PAGE_SIZE;
+	allocs[idx].va = (void*)page_s;
+	allocs[idx].size = page_size;
 	return (void*)page_s;
 
 
@@ -144,21 +144,20 @@ void kfree(void* virtual_address)
 	//panic("kfree() is not implemented yet...!!");
 	//cprintf("%u\n", (KERNEL_HEAP_MAX - kheapPageAllocStart) / PAGE_SIZE); // 32766
 	if( (uint32)virtual_address < kheapPageAllocStart)return free_block(virtual_address);
-	for(int i = 0;i<alloc_count;i++){
-		if (allocs[i].va == virtual_address) {
-				int sz = allocs[i].size;
-		        uint32 page_s = (uint32)virtual_address,page_e = page_s + sz;
-		        for(uint32 j = page_s; j < page_e; j += PAGE_SIZE) return_page((void*)j);
-		        allocs[i] = allocs[alloc_count - 1];
-		        alloc_count--;
-		        if(kheapPageAllocBreak == page_e){
-		        	kheapPageAllocBreak -=sz;
-		        	while(page_free(kheapPageAllocBreak-PAGE_SIZE))kheapPageAllocBreak-=PAGE_SIZE;
-		        }
-		        break;
-		    }
-	}
+	uint32 page_start = ((uint32)virtual_address);
 
+	uint32 idx = (page_start - kheapPageAllocStart)/PAGE_SIZE;
+
+	uint32 sz = allocs[idx].size;
+
+	uint32 page_end = page_start + sz;
+
+	for(uint32 i = page_start;i<page_end;i+=PAGE_SIZE) return_page((void*)i);
+
+	if(kheapPageAllocBreak == page_end){
+		kheapPageAllocBreak-=sz;
+		while(page_free(kheapPageAllocBreak-PAGE_SIZE))kheapPageAllocBreak-=PAGE_SIZE;
+	}
 
 }
 

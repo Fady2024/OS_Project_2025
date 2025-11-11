@@ -6,7 +6,7 @@
 #endif
 
 #include <inc/types.h>
-
+#include <inc/memlayout.h>
 
 /*2017*/
 //Values for user heap placement strategy
@@ -40,15 +40,10 @@ int numOfKheapVACalls ;
 // helper methods
 int get_page(void* va);
 
-
-#define MAX_ALLOCS 32770
-
 struct alloc {
     void* va;
     int32 size;
 };
-
-extern struct alloc allocs[MAX_ALLOCS];
-extern int alloc_count;
+struct alloc allocs[NUM_OF_KHEAP_PAGES];
 
 #endif // FOS_KERN_KHEAP_H_
