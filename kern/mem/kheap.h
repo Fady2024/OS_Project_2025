@@ -37,7 +37,18 @@ unsigned int kheap_virtual_address(unsigned int physical_address);
 unsigned int kheap_physical_address(unsigned int virtual_address);
 
 int numOfKheapVACalls ;
-
+// helper methods
 int get_page(void* va);
+
+
+#define MAX_ALLOCS 32770
+
+struct alloc {
+    void* va;
+    int32 size;
+};
+
+extern struct alloc allocs[MAX_ALLOCS];
+extern int alloc_count;
 
 #endif // FOS_KERN_KHEAP_H_

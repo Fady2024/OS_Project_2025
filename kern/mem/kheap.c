@@ -18,6 +18,11 @@ int page_free(uint32 x){
 	if(perm & PERM_PRESENT) return 0;
 	return 1;
 }
+
+// my st
+struct alloc allocs[MAX_ALLOCS];
+int alloc_count = 0;
+
 //==============================================
 // [1] INITIALIZE KERNEL HEAP:
 //==============================================
@@ -69,6 +74,7 @@ void* kmalloc(unsigned int size)
 	//TODO: [PROJECT'25.GM#2] KERNEL HEAP - #1 kmalloc
 	//Your code is here
 	//Comment the following line
+	//kpanic_into_prompt("kmalloc() is not implemented yet...!!");
 	if(size <=DYN_ALLOC_MAX_BLOCK_SIZE)return alloc_block(size);
 	int num_pages = (size+PAGE_SIZE-1)/PAGE_SIZE , page_size = num_pages * PAGE_SIZE;
 
@@ -117,10 +123,12 @@ void* kmalloc(unsigned int size)
 	}
 	for(uint32 i = page_s; i <page_e;i+=PAGE_SIZE) get_page((void*)i);
 //	cprintf("k2: %u \n",kheapPageAllocBreak);
+	allocs[alloc_count].va = (void*)page_s;
+	allocs[alloc_count].size = page_size;
+	alloc_count++;
 	return (void*)page_s;
 
 
-	//kpanic_into_prompt("kmalloc() is not implemented yet...!!");
 
 	//TODO: [PROJECT'25.BONUS#3] FAST PAGE ALLOCATOR
 }
@@ -133,7 +141,25 @@ void kfree(void* virtual_address)
 	//TODO: [PROJECT'25.GM#2] KERNEL HEAP - #2 kfree
 	//Your code is here
 	//Comment the following line
-	panic("kfree() is not implemented yet...!!");
+	//panic("kfree() is not implemented yet...!!");
+	//cprintf("%u\n", (KERNEL_HEAP_MAX - kheapPageAllocStart) / PAGE_SIZE); // 32766
+	if( (uint32)virtual_address < kheapPageAllocStart)return free_block(virtual_address);
+	for(int i = 0;i<alloc_count;i++){
+		if (allocs[i].va == virtual_address) {
+				int sz = allocs[i].size;
+		        uint32 page_s = (uint32)virtual_address,page_e = page_s + sz;
+		        for(uint32 j = page_s; j < page_e; j += PAGE_SIZE) return_page((void*)j);
+		        allocs[i] = allocs[alloc_count - 1];
+		        alloc_count--;
+		        if(kheapPageAllocBreak == page_e){
+		        	kheapPageAllocBreak -=sz;
+		        	while(page_free(kheapPageAllocBreak-PAGE_SIZE))kheapPageAllocBreak-=PAGE_SIZE;
+		        }
+		        break;
+		    }
+	}
+
+
 }
 
 //=================================
