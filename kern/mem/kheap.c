@@ -13,7 +13,7 @@
 
 
 // My Helper Methods
-int page_free(uint32 x){
+int is_free(uint32 x){
 	int perm  = pt_get_page_permissions(ptr_page_directory,x);
 	if(perm & PERM_PRESENT) return 0;
 	return 1;
@@ -81,7 +81,7 @@ void* kmalloc(unsigned int size)
 	uint32 start = 0,end = 0;
 	uint32 exact_s = 0,exact_e=0,worst_s=0,worst_e=0;
 	for(uint32 i = kheapPageAllocStart; i <kheapPageAllocBreak;i+=PAGE_SIZE){
-		if(page_free(i)){
+		if(is_free(i)){
 			end = i+PAGE_SIZE;
 			if(start == 0) start = i;
 		}
@@ -167,7 +167,7 @@ void kfree(void* virtual_address)
 
 	if(kheapPageAllocBreak == page_end){
 		kheapPageAllocBreak-=sz;
-		while(page_free(kheapPageAllocBreak-PAGE_SIZE))kheapPageAllocBreak-=PAGE_SIZE;
+		while(kheapPageAllocBreak > kheapPageAllocStart && is_free(kheapPageAllocBreak-PAGE_SIZE))kheapPageAllocBreak-=PAGE_SIZE;
 	}
 
 }
@@ -219,6 +219,95 @@ void *krealloc(void *virtual_address, uint32 new_size)
 	//Your code is here
 	//Comment the following line
 	//panic("krealloc() is not implemented yet...!!");
-	kfree(virtual_address);
-	return kmalloc(new_size);
+
+	// ALLOCATE NEW SPACE IN KERNEL
+	if(virtual_address == NULL) return kmalloc(new_size);
+
+	// FREE SPACE FROM KERNEL
+	if(new_size == 0){
+		kfree(virtual_address);
+		return NULL;
+	}
+
+	// IF THE NEW SIZE NO MORE NEEDS PAGES
+	if(new_size <= DYN_ALLOC_MAX_BLOCK_SIZE)return realloc_block(virtual_address,new_size);
+
+
+	uint32 va = (uint32)virtual_address;
+	int32 idx = (va  - kheapPageAllocStart)/PAGE_SIZE;
+	va = (uint32)allocs[idx].va;
+
+	int32 old_pages_size = allocs[idx].size;
+	int num_pages = (new_size+PAGE_SIZE-1)/PAGE_SIZE , new_pages_size = num_pages * PAGE_SIZE;
+
+
+
+
+	// IF THE NEW SIZE < OLD SIZE
+	if(new_pages_size < old_pages_size){
+
+		int32 start = va + new_pages_size;
+		int32 end = va + old_pages_size;
+
+		for(int i = start ; i<end ; i+=PAGE_SIZE){
+			uint32 id = (i  - kheapPageAllocStart)/PAGE_SIZE;
+			allocs[id].va = NULL;
+			allocs[id].size = 0;
+			return_page((void*)i);
+		}
+		return virtual_address;
+
+	}
+
+	// Extend UP
+	bool can_extend =1;
+	int n_start = va + old_pages_size;
+	int n_end = va + new_pages_size;
+	int mx_end = n_start;
+	if(n_end > KERNEL_HEAP_MAX)can_extend = 0;
+	else{
+		for(int i = n_start;i<n_end;i+=PAGE_SIZE)
+			if(!is_free(i)){mx_end = i - PAGE_SIZE;
+				can_extend = 0;break;}
+	}
+	if(can_extend){
+		for(int i = n_start;i<n_end;i+=PAGE_SIZE){
+			uint32 idx= (i  - kheapPageAllocStart)/PAGE_SIZE;
+			allocs[idx].va = (void*)va;
+			allocs[idx].size = new_pages_size;
+			get_page((void*)i);
+		}
+		if(n_end > kheapPageAllocBreak)kheapPageAllocBreak = n_end;
+		return (void*) va;
+	}
+
+	//EXTEND DOWN
+	can_extend = 1;
+	n_start = mx_end - new_pages_size;
+	for(int i = n_start; i<mx_end; i+=PAGE_SIZE){
+		if(!is_free(i) && allocs[(i  - kheapPageAllocStart)/PAGE_SIZE].va !=(void*)va){
+			can_extend = 0;
+		}
+	}
+	if(can_extend){
+		for(int i = n_start; i<mx_end;i+=PAGE_SIZE){
+			uint32 idx= (i  - kheapPageAllocStart)/PAGE_SIZE;
+			allocs[idx].va = (void*)n_start;
+			allocs[idx].size = new_pages_size;
+			if(!is_free(i)) get_page((void*)i);
+		}
+		return (void*)n_start;
+	}
+
+	// CAN`T EXTEND
+	void* n_va = kmalloc(new_size);
+	if(n_va == NULL) return NULL;
+	for(int i = va ; i <va + old_pages_size;i+=PAGE_SIZE){
+		uint32 idx= (i  - kheapPageAllocStart)/PAGE_SIZE;
+		allocs[idx].va = NULL;
+		allocs[idx].size = 0;
+		return_page((void*)i);
+	}
+	return n_va;
+
 }
