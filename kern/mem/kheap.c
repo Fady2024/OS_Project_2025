@@ -180,7 +180,9 @@ unsigned int kheap_virtual_address(unsigned int physical_address)
 	//TODO: [PROJECT'25.GM#2] KERNEL HEAP - #3 kheap_virtual_address
 	//Your code is here
 	//Comment the following line
-	panic("kheap_virtual_address() is not implemented yet...!!");
+	//panic("kheap_virtual_address() is not implemented yet...!!");
+	numOfKheapVACalls++;
+		return physical_to_virtual(ptr_page_directory, physical_address);
 
 	/*EFFICIENT IMPLEMENTATION ~O(1) IS REQUIRED */
 }
@@ -193,9 +195,10 @@ unsigned int kheap_physical_address(unsigned int virtual_address)
 	//TODO: [PROJECT'25.GM#2] KERNEL HEAP - #4 kheap_physical_address
 	//Your code is here
 	//Comment the following line
-	panic("kheap_physical_address() is not implemented yet...!!");
+	//panic("kheap_physical_address() is not implemented yet...!!");
+    return virtual_to_physical(ptr_page_directory, virtual_address);
 
-	/*EFFICIENT IMPLEMENTATION ~O(1) IS REQUIRED */
+		/*EFFICIENT IMPLEMENTATION ~O(1) IS REQUIRED */
 }
 
 //=================================================================================//
@@ -311,3 +314,4 @@ void *krealloc(void *virtual_address, uint32 new_size)
 	return n_va;
 
 }
+
