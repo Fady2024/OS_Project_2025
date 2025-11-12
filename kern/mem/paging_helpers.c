@@ -91,7 +91,15 @@ inline uint32 virtual_to_physical(uint32* directory, uint32 virtual_address)
 {
 	//TODO: PRACTICE: fill this function.
 	//Comment the following line
-	panic("Function is not implemented yet!");
+	//panic("Function is not implemented yet!");
+	uint32 pte = vpt[VPN(virtual_address)];
+		if ((pte & PERM_PRESENT) == 0)
+			return 0;
+
+		uint32 frame_pa  = EXTRACT_ADDRESS(pte);
+		uint32 offset = virtual_address & (PAGE_SIZE - 1);
+		uint32 PA=frame_pa + offset;
+		return PA;
 }
 
 //===============================
@@ -104,7 +112,25 @@ inline uint32 physical_to_virtual(uint32* directory, uint32 physical_address)
 {
 	//TODO: PRACTICE: fill this function.
 	//Comment the following line
-	panic("Function is not implemented yet!");
+	//panic("Function is not implemented yet!");
+	
+	if (physical_address == 0)
+		return 0;
+
+	uint32 FN = physical_address & 0xFFFFF000;
+	uint32 offset = PGOFF(physical_address);
+
+	for (uint32 vpn = VPN(KERNEL_HEAP_START); vpn < VPN(KERNEL_HEAP_MAX); vpn++)
+	{
+		if ((vpt[vpn] & PERM_PRESENT) && ((vpt[vpn] & 0xFFFFF000) == FN))
+		{
+			uint32 va = (vpn << PTXSHIFT) + offset;
+			return va;
+		}
+	}
+
+	return 0xFFFFFFFF;
+
 }
 
 //===============================
@@ -244,3 +270,4 @@ inline void pd_clear_page_dir_entry(uint32* directory, uint32 virtual_address)
 	directory[PDX(virtual_address)] = 0 ;
 	tlbflush();
 }
+
