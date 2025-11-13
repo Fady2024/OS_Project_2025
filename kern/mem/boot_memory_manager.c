@@ -9,6 +9,7 @@
 #include <kern/disk/pagefile_manager.h>
 #include <kern/cpu/cpu.h>
 #include "memory_manager.h"
+#include "kheap.h"
 
 
 /*2024: Removed. Replaced by a call to the lgdt()*/
@@ -151,6 +152,10 @@ void initialize_kernel_VM()
 
 	uint32 disk_array_size = PAGES_PER_FILE * sizeof(struct FrameInfo);
 	disk_frames_info = boot_allocate_space(disk_array_size , PAGE_SIZE);
+
+	PhysAddrToVirtAddr_kheap = boot_allocate_space(number_of_frames * sizeof(uint32), PAGE_SIZE);
+	memset(PhysAddrToVirtAddr_kheap, 0, number_of_frames * sizeof(uint32));
+	PhysAddrToVirtAddr_ready = 1;
 	/*2023: this line is moved to the boot_allocate_space()*/ //memset(disk_frames_info , 0, disk_array_size);
 
 	// This allows the kernel & user to access any page table entry using a

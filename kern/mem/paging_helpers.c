@@ -114,22 +114,21 @@ inline uint32 physical_to_virtual(uint32* directory, uint32 physical_address)
 	//Comment the following line
 	//panic("Function is not implemented yet!");
 	
-	if (physical_address == 0)
-		return 0;
+    if (physical_address == 0)
+        return 0;
 
-	uint32 FN = physical_address & 0xFFFFF000;
-	uint32 offset = PGOFF(physical_address);
+    if (PhysAddrToVirtAddr_ready && PhysAddrToVirtAddr_kheap != NULL)
+    {
+        uint32 fn = PPN(physical_address);
+        if (fn < number_of_frames)
+        {
+            uint32 base = PhysAddrToVirtAddr_kheap[fn];
+            if (base != 0)
+                return base + PGOFF(physical_address);
+        }
+    }
 
-	for (uint32 vpn = VPN(KERNEL_HEAP_START); vpn < VPN(KERNEL_HEAP_MAX); vpn++)
-	{
-		if ((vpt[vpn] & PERM_PRESENT) && ((vpt[vpn] & 0xFFFFF000) == FN))
-		{
-			uint32 va = (vpn << PTXSHIFT) + offset;
-			return va;
-		}
-	}
-
-	return 0xFFFFFFFF;
+    return 0xFFFFFFFF;
 
 }
 

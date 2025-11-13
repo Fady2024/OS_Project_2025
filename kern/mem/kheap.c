@@ -1,6 +1,7 @@
 #include "kheap.h"
 
 #include <inc/memlayout.h>
+#include <inc/string.h>
 #include <inc/dynamic_allocator.h>
 #include <kern/conc/sleeplock.h>
 #include <kern/proc/user_environment.h>
@@ -20,8 +21,10 @@ int is_free(uint32 x){
 }
 
 // my st
-struct alloc allocs[NUM_OF_KHEAP_PAGES];
+struct alloc allocs[NUM_OF_KHEAP_PAGES]; 
 
+uint32 *PhysAddrToVirtAddr_kheap;
+int PhysAddrToVirtAddr_ready = 0;
 
 //==============================================
 // [1] INITIALIZE KERNEL HEAP:
@@ -51,6 +54,11 @@ int get_page(void* va)
 	int ret = alloc_page(ptr_page_directory, ROUNDDOWN((uint32)va, PAGE_SIZE), PERM_WRITEABLE, 1);
 	if (ret < 0)
 		panic("get_page() in kern: failed to allocate page from the kernel");
+	{
+		uint32 pa = virtual_to_physical(ptr_page_directory, ROUNDDOWN((uint32)va, PAGE_SIZE));
+		if (pa != 0 && PhysAddrToVirtAddr_kheap != NULL)
+			PhysAddrToVirtAddr_kheap[PPN(pa)] = ROUNDDOWN((uint32)va, PAGE_SIZE);
+	}
 	return 0;
 }
 
@@ -59,6 +67,9 @@ int get_page(void* va)
 //==============================================
 void return_page(void* va)
 {
+	uint32 pa = virtual_to_physical(ptr_page_directory,ROUNDDOWN((uint32)va, PAGE_SIZE));
+	if (pa != 0 && PhysAddrToVirtAddr_kheap != NULL)
+		PhysAddrToVirtAddr_kheap[PPN(pa)] = 0;
 	unmap_frame(ptr_page_directory, ROUNDDOWN((uint32)va, PAGE_SIZE));
 }
 
@@ -181,10 +192,10 @@ unsigned int kheap_virtual_address(unsigned int physical_address)
 	//Your code is here
 	//Comment the following line
 	//panic("kheap_virtual_address() is not implemented yet...!!");
-	numOfKheapVACalls++;
-		return physical_to_virtual(ptr_page_directory, physical_address);
-
-	/*EFFICIENT IMPLEMENTATION ~O(1) IS REQUIRED */
+    numOfKheapVACalls++;
+    uint32 va = physical_to_virtual(ptr_page_directory, physical_address);
+    return (va == 0xFFFFFFFF) ? 0 : va;
+		/*EFFICIENT IMPLEMENTATION ~O(1) IS REQUIRED */
 }
 
 //=================================

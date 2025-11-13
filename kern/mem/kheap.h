@@ -45,5 +45,7 @@ struct alloc {
     int32 size;
 };
 struct alloc allocs[NUM_OF_KHEAP_PAGES];
+extern uint32 *PhysAddrToVirtAddr_kheap;
+extern int PhysAddrToVirtAddr_ready;
 
 #endif // FOS_KERN_KHEAP_H_
