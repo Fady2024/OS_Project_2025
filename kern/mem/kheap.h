@@ -1,3 +1,4 @@
+
 #ifndef FOS_KERN_KHEAP_H_
 #define FOS_KERN_KHEAP_H_
 
@@ -45,6 +46,7 @@ struct alloc {
     int32 size;
 };
 struct alloc allocs[NUM_OF_KHEAP_PAGES];
+struct kspinlock kheap_lk;
 extern uint32 *PhysAddrToVirtAddr_kheap;
 extern int PhysAddrToVirtAddr_ready;
 
