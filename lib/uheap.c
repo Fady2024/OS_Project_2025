@@ -1,5 +1,16 @@
 #include <inc/lib.h>
+//=============MY METHODS AND DS=======================
+struct alloc {
+    void* va;
+    int32 size;
+};
+struct alloc allocs[NUM_OF_UHEAP_PAGES];
+struct uspinlock uheap_lk;
 
+// ============METHODS==============
+int get_idx(uint32 i){
+	return (i-uheapPageAllocStart)/PAGE_SIZE;
+}
 //==================================================================================//
 //============================== GIVEN FUNCTIONS ===================================//
 //==================================================================================//
@@ -16,9 +27,10 @@ void uheap_init()
 		uheapPlaceStrategy = sys_get_uheap_strategy();
 		uheapPageAllocStart = dynAllocEnd + PAGE_SIZE;
 		uheapPageAllocBreak = uheapPageAllocStart;
-
 		__firstTimeFlag = 0;
+		init_uspinlock(&uheap_lk, "uheap", 1);
 	}
+
 }
 
 //==============================================
@@ -59,7 +71,66 @@ void* malloc(uint32 size)
 	//TODO: [PROJECT'25.IM#2] USER HEAP - #1 malloc
 	//Your code is here
 	//Comment the following line
-	panic("malloc() is not implemented yet...!!");
+	//panic("malloc() is not implemented yet...!!");
+	if(size <=DYN_ALLOC_MAX_BLOCK_SIZE){
+		return alloc_block(size);
+	}
+
+    acquire_uspinlock(&uheap_lk);
+
+	uint32 num_pages= (size + PAGE_SIZE-1)/PAGE_SIZE , pages_size = num_pages*PAGE_SIZE;
+	uint32 start = 0,end = 0;
+	uint32 exact_s = 0,exact_e=0,worst_s=0,worst_e=0;
+	for(uint32 i = uheapPageAllocStart; i <uheapPageAllocBreak;i+=PAGE_SIZE){
+		int idx = get_idx(i);
+		if(allocs[idx].va == NULL){
+			end = i+PAGE_SIZE;
+			if(start == 0) start = i;
+		}
+		else {
+			if(end - start >=pages_size){
+				//exact fit
+				if(end - start == pages_size) {
+					exact_s= start,exact_e=end;
+					break;
+				}
+				// worst
+				else if( (end-start) > worst_e-worst_s){
+					worst_e = end,worst_s = start;
+				}
+			}
+			start= 0,end = 0;
+		}
+	}
+
+	uint32 page_s = 0,page_e = 0;
+	// exact fit
+	if(exact_s!=0) page_s = exact_s,page_e = exact_e;
+	// worst fit
+	else if(worst_s !=0) page_s = worst_s,page_e=worst_s + pages_size;
+	// !exact and !worst
+	else{
+		if(uheapPageAllocBreak <= USER_HEAP_MAX - pages_size){
+			page_s = uheapPageAllocBreak;
+			page_e = uheapPageAllocBreak  + pages_size;
+			uheapPageAllocBreak = page_e;
+		}
+		else {
+            release_uspinlock(&uheap_lk);
+			return NULL;
+		}
+
+	}
+	for(uint32 i = page_s; i <page_e;i+=PAGE_SIZE){
+		uint32 idx = get_idx(i);
+		allocs[idx].va = (void*)page_s;
+		allocs[idx].size = pages_size;
+	}
+    release_uspinlock(&uheap_lk);
+	sys_allocate_user_mem(page_s,pages_size);
+	return (void*)page_s;
+
+
 }
 
 //=================================
@@ -70,7 +141,33 @@ void free(void* virtual_address)
 	//TODO: [PROJECT'25.IM#2] USER HEAP - #3 free
 	//Your code is here
 	//Comment the following line
-	panic("free() is not implemented yet...!!");
+	//panic("free() is not implemented yet...!!");
+	uint32 idx = get_idx((uint32)virtual_address);
+	uint32 size = allocs[idx].size;
+	if(size <=DYN_ALLOC_MAX_BLOCK_SIZE){
+		return free_block(virtual_address);
+	}
+
+	acquire_uspinlock(&uheap_lk);
+
+	virtual_address = allocs[idx].va;
+	uint32 end = (int32)virtual_address + size;
+	for(uint32 i = (uint32)virtual_address;i<end; i+=PAGE_SIZE){
+		idx = get_idx(i);
+		allocs[idx].size = 0;
+		allocs[idx].va = NULL;
+	}
+	idx = get_idx(end);
+	if(uheapPageAllocBreak == end){
+		uheapPageAllocBreak-=size;
+		while(uheapPageAllocBreak > uheapPageAllocStart && allocs[get_idx(uheapPageAllocBreak-PAGE_SIZE)].va == NULL)
+			uheapPageAllocBreak-=PAGE_SIZE;
+	}
+
+    release_uspinlock(&uheap_lk);
+
+	sys_free_user_mem((uint32)virtual_address,size);
+
 }
 
 //=================================
