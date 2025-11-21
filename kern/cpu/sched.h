@@ -59,6 +59,10 @@ struct
 int64 ticks;
 int64 timer_ticks() ;
 
+//Created by Fady Gerges - 2026
+//Starvation threshold for PRIRR
+uint32 PRIRRS_starvThresh; 
+
 //BSD
 #define PRI_MIN 0
 #define PRI_MAX 63

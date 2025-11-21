@@ -52,6 +52,8 @@ enum
 	SYS_free_user_mem,
 	//TODO: [PROJECT'25.IM#4] CPU SCHEDULING - #1 System Calls - Add suitable code here
 	//Your code is here
+	//system calls for Priority RR scheduler
+	SYS_env_set_priority,
 
 	//=====================================================================
 	NSYSCALLS
