@@ -475,4 +475,3 @@ void setup_listing_to_all_page_tables_entries()
 }
 
 ///******************************* END of MAPPING KERNEL SPACE *******************************
-

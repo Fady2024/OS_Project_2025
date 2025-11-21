@@ -165,6 +165,24 @@ void fault_handler(struct Trapframe *tf)
 			//TODO: [PROJECT'25.GM#3] FAULT HANDLER I - #2 Check for invalid pointers
 			//(e.g. pointing to unmarked user heap page, kernel or wrong access rights),
 			//your code is here
+			uint32 perms = pt_get_page_permissions(faulted_env->env_page_directory, fault_va);
+
+			if (fault_va >= USER_HEAP_START && fault_va < USER_HEAP_MAX)
+			{
+				if ((perms & PERM_UHPAGE) == 0)
+				{
+					env_exit();
+				}
+			}
+			if (fault_va >= KERNEL_BASE)
+			{
+				env_exit();
+			}
+			if ((perms & PERM_PRESENT) && ((perms & PERM_WRITEABLE) == 0))
+			{
+				env_exit();
+			}
+
 
 			/*============================================================================================*/
 		}
@@ -258,7 +276,52 @@ void page_fault_handler(struct Env * faulted_env, uint32 fault_va)
 		//TODO: [PROJECT'25.GM#3] FAULT HANDLER I - #3 placement
 		//Your code is here
 		//Comment the following line
-		panic("page_fault_handler().PLACEMENT is not implemented yet...!!");
+		//panic("page_fault_handler().PLACEMENT is not implemented yet...!!");
+
+		struct FrameInfo* frame = NULL;
+		allocate_frame(&frame);
+		frame->proc = faulted_env;
+
+		int perms =  PERM_WRITEABLE | PERM_USER;
+		if (fault_va >= USER_HEAP_START && fault_va < USER_HEAP_MAX)
+		    perms |= PERM_UHPAGE;
+
+		map_frame(faulted_env->env_page_directory, frame, fault_va, perms);
+
+		uint32 read_page = pf_read_env_page(faulted_env, (void*)fault_va);
+		if (read_page == E_PAGE_NOT_EXIST_IN_PF)
+		{
+			cprintf("0- PAGE FAULT HANDLER: Fault at address 0x%x, wsSize = %d\n", fault_va, wsSize);
+			if (fault_va < USTACKTOP && fault_va >= USTACKBOTTOM)
+			{
+				cprintf("1- PAGE FAULT HANDLER: Fault at address 0x%x, wsSize = %d\n", fault_va, wsSize);
+				memset((void*)ROUNDDOWN(fault_va, PAGE_SIZE), 0, PAGE_SIZE);
+				cprintf("1.5- PAGE FAULT HANDLER: Fault at address 0x%x, wsSize = %d\n", fault_va, wsSize);
+			}
+			else if (fault_va >= USER_HEAP_START && fault_va < USER_HEAP_MAX)
+			{
+				cprintf("2- PAGE FAULT HANDLER: Fault at address 0x%x, wsSize = %d\n", fault_va, wsSize);
+				memset((void*)ROUNDDOWN(fault_va, PAGE_SIZE), 0, PAGE_SIZE);
+			}
+			else
+			{
+				cprintf("3- PAGE FAULT HANDLER: Fault at address 0x%x, wsSize = %d\n", fault_va, wsSize);
+				unmap_frame(faulted_env->env_page_directory, fault_va);
+				env_exit();
+			}
+		}
+		cprintf("4- PAGE FAULT HANDLER: Fault at address 0x%x, wsSize = %d\n", fault_va, wsSize);
+
+
+		struct WorkingSetElement* new_ele = env_page_ws_list_create_element(faulted_env, fault_va);
+		LIST_INSERT_TAIL(&(faulted_env->page_WS_list), new_ele);
+		if(faulted_env->page_WS_list.size == faulted_env->page_WS_max_size){
+			faulted_env->page_last_WS_element =(struct WorkingSetElement*) LIST_FIRST(&(faulted_env->page_WS_list));
+		}
+		else faulted_env->page_last_WS_element = NULL;
+
+		cprintf("5- PAGE FAULT HANDLER: Fault at address 0x%x, wsSize = %d\n", fault_va, wsSize);
+
 	}
 	else
 	{

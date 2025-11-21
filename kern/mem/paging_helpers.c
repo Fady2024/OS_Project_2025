@@ -71,11 +71,27 @@ inline int pt_get_page_permissions(uint32* directory, uint32 virtual_address )
 //REMEMBER: to invalidate the TLB cache
 inline void pt_clear_page_table_entry(uint32* directory, uint32 virtual_address)
 {
-	//TODO: PRACTICE: fill this function.
-	//Comment the following line
-	panic("pt_clear_page_table_entry() is not implemented yet!");
-}
+    //TODO: PRACTICE: fill this function.
+    //Comment the following line
+    //panic("pt_clear_page_table_entry() is not implemented yet!");
+    // Get the table
+	uint32* ptr_page_table ;
+	int ret = get_page_table(directory, virtual_address, &ptr_page_table);
+	// If exists, update permissions
+	if (ptr_page_table != NULL)
+	{
+		ptr_page_table[PTX(virtual_address)] = 0;
+	}
+	// Else should "panic"
+	else
+	{
+		panic("function pt_clear_page_table_entry() called with invalid virtual address. The corresponding page table doesn't exist\n") ;
+	}
 
+	// Invalidate the cache memory
+	tlb_invalidate((void *)NULL, (void *)virtual_address);
+
+}
 /***********************************************************************************************/
 /***********************************************************************************************/
 
@@ -113,7 +129,7 @@ inline uint32 physical_to_virtual(uint32* directory, uint32 physical_address)
 	//TODO: PRACTICE: fill this function.
 	//Comment the following line
 	//panic("Function is not implemented yet!");
-	
+
     if (physical_address == 0)
         return 0;
 
@@ -269,4 +285,3 @@ inline void pd_clear_page_dir_entry(uint32* directory, uint32 virtual_address)
 	directory[PDX(virtual_address)] = 0 ;
 	tlbflush();
 }
-
