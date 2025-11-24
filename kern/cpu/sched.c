@@ -225,10 +225,30 @@ void sched_init_PRIRR(uint8 numOfPriorities, uint8 quantum, uint32 starvThresh)
 		//TODO: [PROJECT'25.IM#4] CPU SCHEDULING - #2 sched_init_PRIRR
 		//Your code is here
 		//Comment the following line
-		panic("sched_init_PRIRR() is not implemented yet...!!");
+		//panic("sched_init_PRIRR() is not implemented yet...!!");
+		if(numOfPriorities <=0 ||quantum <=0 || starvThresh <=0)
+			panic("Error In sched_init_PRIRR: invalid input parameters");
 
+		num_of_ready_queues = numOfPriorities;
 
+#if USE_KHEAP
 
+		sched_delete_ready_queues();
+
+		ProcessQueues.env_ready_queues = kmalloc(num_of_ready_queues * sizeof(struct Env_Queue));
+		quantums = kmalloc(num_of_ready_queues * sizeof(uint8));
+		if (ProcessQueues.env_ready_queues == NULL)panic("Error In sched_init_PRIRR: null ready queues pointer");
+		if (quantums == NULL)panic("Error In sched_init_PRIRR: null quantums pointer");
+
+		for (int s = 0; s < num_of_ready_queues; ++s)
+		{
+			init_queue(&(ProcessQueues.env_ready_queues[s]));
+			quantums[s] = quantum;
+		}
+#endif
+
+		kclock_set_quantum(quantums[0]);
+		sched_set_starv_thresh(starvThresh);
 	}
 	//=========================================
 	//DON'T CHANGE THESE LINES=================
@@ -313,7 +333,30 @@ struct Env* fos_scheduler_PRIRR()
 	//TODO: [PROJECT'25.IM#4] CPU SCHEDULING - #3 fos_scheduler_PRIRR
 	//Your code is here
 	//Comment the following line
-	panic("fos_scheduler_PRIRR() is not implemented yet...!!");
+	//panic("fos_scheduler_PRIRR() is not implemented yet...!!");
+
+
+	struct Env *next_proc_running = NULL;
+	struct Env *curr_proc_running = get_cpu_proc();
+	
+	if (curr_proc_running == NULL) panic("Error In fos_scheduler_PRIRR: null current running process pointer");
+
+	if (curr_proc_running != NULL && curr_proc_running->env_status == ENV_READY)
+	{
+		sched_insert_ready(curr_proc_running);
+	}
+
+	for (int p = 0; p < num_of_ready_queues; ++p)
+	{
+		next_proc_running = dequeue(&(ProcessQueues.env_ready_queues[p]));
+		if (next_proc_running != NULL)
+		{
+			kclock_set_quantum(quantums[p]);
+			break;
+		}
+	}
+
+	return next_proc_running;
 }
 
 //========================================
@@ -325,12 +368,45 @@ void clock_interrupt_handler(struct Trapframe* tf)
 	if (isSchedMethodPRIRR())
 	{
 		//TODO: [PROJECT'25.IM#4] CPU SCHEDULING - #4 clock_interrupt_handler
-		//Your code is here
-		//Comment the following line
-		panic("clock_interrupt_handler() is not implemented yet...!!");
+		// Your code is here
+		// Comment the following line
+		//panic("clock_interrupt_handler() is not implemented yet...!!");
 
 
+		acquire_kspinlock(&ProcessQueues.qlock);
+		{
+			for (int QPr = 0; QPr < num_of_ready_queues; ++QPr)
+			{
+				struct Env_Queue *q = &ProcessQueues.env_ready_queues[QPr];
+				if (LIST_EMPTY(q) == 1) continue;
 
+				struct Env *e = NULL;
+				LIST_FOREACH(e, q)
+				{
+					e->prirrs_wait_ticks++;
+				}
+
+
+				if (QPr > 0)
+				{
+					struct Env *cur = LIST_FIRST(q);
+					while (cur != NULL)
+					{
+						struct Env *nextOfCurrent = LIST_NEXT(cur);
+						if (cur->prirrs_wait_ticks >= PRIRRS_starvThresh)
+						{
+							LIST_REMOVE(q, cur);
+							cur->priority = QPr - 1;
+							cur->prirrs_wait_ticks = 0;
+							LIST_INSERT_HEAD(&ProcessQueues.env_ready_queues[QPr - 1], cur);
+						}
+						cur = nextOfCurrent;
+					}
+				}
+			}
+			
+		}
+		release_kspinlock(&ProcessQueues.qlock);
 	}
 
 	/********DON'T CHANGE THESE LINES***********/

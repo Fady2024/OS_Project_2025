@@ -290,7 +290,9 @@ void sys_env_set_priority(int32 envID, int priority)
 	//TODO: [PROJECT'25.IM#4] CPU SCHEDULING - #1 System Calls - Add suitable code here
 	//Your code is here
 	//Comment the following line
-	panic("sys_env_set_priority() is not implemented yet...!!");
+	//panic("sys_env_set_priority() is not implemented yet...!!");
+	syscall(SYS_env_set_priority, (uint32)envID, (uint32)priority, 0, 0, 0);
+
 }
 //=============================================
 
