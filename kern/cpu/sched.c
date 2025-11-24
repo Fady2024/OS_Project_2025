@@ -335,12 +335,9 @@ struct Env* fos_scheduler_PRIRR()
 	//Comment the following line
 	//panic("fos_scheduler_PRIRR() is not implemented yet...!!");
 
-
 	struct Env *next_proc_running = NULL;
 	struct Env *curr_proc_running = get_cpu_proc();
 	
-	if (curr_proc_running == NULL) panic("Error In fos_scheduler_PRIRR: null current running process pointer");
-
 	if (curr_proc_running != NULL && curr_proc_running->env_status == ENV_READY)
 	{
 		sched_insert_ready(curr_proc_running);
