@@ -178,6 +178,7 @@ struct Env {
 	//==================
 	/*CPU PRIORITY RR Sched...*/
 	//==================
+	uint32 prirrs_wait_ticks;
 
 	//================
 	/*STATISTICS...*/
