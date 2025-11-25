@@ -240,9 +240,11 @@ int get_page_table(uint32 *ptr_page_directory, const uint32 virtual_address, uin
 	if ( (page_directory_entry & PERM_PRESENT) == PERM_PRESENT)
 	{
 		//	cprintf("gpt .07, page_directory_entry= %x \n",page_directory_entry);
-		if(USE_KHEAP && !CHECK_IF_KERNEL_ADDRESS(virtual_address))
+		if(USE_KHEAP && (!CHECK_IF_KERNEL_ADDRESS(virtual_address) || virtual_address >= KERNEL_HEAP_START))
 		{
 			*ptr_page_table = (void *)kheap_virtual_address(EXTRACT_ADDRESS(page_directory_entry)) ;
+			if (*ptr_page_table == 0)
+				*ptr_page_table = STATIC_KERNEL_VIRTUAL_ADDRESS(EXTRACT_ADDRESS(page_directory_entry)) ;
 			//cprintf("===>get_page_table: page_dir_entry = %x ptr_page_table = %x\n", page_directory_entry,*ptr_page_table);
 		}
 		else

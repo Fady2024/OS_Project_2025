@@ -178,9 +178,16 @@ void fault_handler(struct Trapframe *tf)
 			{
 				env_exit();
 			}
-			if ((perms & PERM_PRESENT) && ((perms & PERM_WRITEABLE) == 0))
+			if (perms & PERM_PRESENT)
 			{
-				env_exit();
+				if ((perms & PERM_USER) == 0)
+				{
+					env_exit();
+				}
+				if ((perms & PERM_WRITEABLE) == 0)
+				{
+					env_exit();
+				}
 			}
 
 

@@ -919,15 +919,17 @@ void* create_user_kern_stack(uint32* ptr_user_page_directory)
 	if(s == NULL) panic("failed to allocate k_stack");
 	uint32 guard = ROUNDDOWN((uint32)s,PAGE_SIZE);
 
+	if (ptr_user_page_directory[PDX(guard)] != ptr_page_directory[PDX(guard)])
+	{
+		ptr_user_page_directory[PDX(guard)] = ptr_page_directory[PDX(guard)];
+	}
+
 	unmap_frame(ptr_user_page_directory,guard);
-//	pt_set_page_permissions(ptr_user_page_directory,guard,0,PERM_PRESENT);
-	uint32 end = (uint32)guard + KERNEL_STACK_SIZE;
-	for(uint32 i = (uint32)guard; i< end;i+=PAGE_SIZE){
-//		struct FrameInfo *f = NULL;
-//		allocate_frame(&f);
-//		map_frame(ptr_user_page_directory, f, i, PERM_WRITEABLE | PERM_UHPAGE );  // no user perm
-		int perm = pt_get_page_permissions(ptr_user_page_directory,i);
-		cprintf("PERM: 0x%x\n",perm);
+	uint32 *pt = NULL;
+	get_page_table(ptr_user_page_directory, guard, &pt);
+	if (pt)
+	{
+		pt[PTX(guard)] = PERM_AVAILABLE;
 	}
 	cprintf("FINISH\n");
 	return s;

@@ -18,6 +18,7 @@
 int is_free(uint32 x){
 	int perm  = pt_get_page_permissions(ptr_page_directory,x);
 	if(perm & PERM_PRESENT) return 0;
+	if(perm & PERM_AVAILABLE) return 0;
 	return 1;
 }
 
