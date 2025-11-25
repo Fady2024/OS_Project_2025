@@ -386,10 +386,9 @@ void clock_interrupt_handler(struct Trapframe* tf)
 
 				if (QPr > 0)
 				{
-					struct Env *cur = LIST_FIRST(q);
-					while (cur != NULL)
+					struct Env *cur = NULL;
+					LIST_FOREACH_SAFE(cur, q, Env)
 					{
-						struct Env *nextOfCurrent = LIST_NEXT(cur);
 						if (cur->prirrs_wait_ticks >= PRIRRS_starvThresh)
 						{
 							LIST_REMOVE(q, cur);
@@ -397,7 +396,6 @@ void clock_interrupt_handler(struct Trapframe* tf)
 							cur->prirrs_wait_ticks = 0;
 							LIST_INSERT_HEAD(&ProcessQueues.env_ready_queues[QPr - 1], cur);
 						}
-						cur = nextOfCurrent;
 					}
 				}
 			}

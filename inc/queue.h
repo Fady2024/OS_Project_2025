@@ -182,9 +182,15 @@ struct {								\
 //TODO: Warning CANNOT BE USED AS NESTED LOOP because of the temp ___ptr_next, NEEDS MODIFICATION
 #define LIST_FOREACH(var, head)					\
 	for ((var) = LIST_FIRST((head));				\
-	( (head)->___ptr_next = LOOP_LIST_NEXT((var))) || (var);							\
+	((head)->___ptr_next = LOOP_LIST_NEXT((var))) || (var);			\
 	(var) = (head)->___ptr_next)
 
+//TODO: 2025 - Safe to use this version of LIST_FOREACH
+#define LIST_FOREACH_SAFE(var, head, type)					\
+	struct type *___ptr_next; \
+	for ((var) = LIST_FIRST((head));				\
+	(___ptr_next = LOOP_LIST_NEXT((var))) || (var);			\
+	(var) = ___ptr_next)
 /*
  * Reset the list named "head" to the empty list.
  */
