@@ -150,9 +150,12 @@ struct Channel __tstchan__ ;
 struct kspinlock __tstchan_lk__;
 int __firstTimeSleepLock = 1;
 struct sleeplock __tstslplk__;
-
+int __numOfSlaves = 0;
+#define __maxNumOfKSems (10)
+struct ksemaphore __ksems[__maxNumOfKSems];
 void sys_utilities(char* utilityName, int value)
 {
+#if USE_KHEAP
 	if (strncmp(utilityName, "__BSDSetNice@", strlen("__BSDSetNice@")) == 0)
 	{
 		int number_of_tokens;
@@ -280,7 +283,9 @@ void sys_utilities(char* utilityName, int value)
 			init_kspinlock(&__tstchan_lk__, "Test Channel Lock");
 		}
 		acquire_kspinlock(&__tstchan_lk__);
-		sleep(&__tstchan__, &__tstchan_lk__);
+		{
+			sleep(&__tstchan__, &__tstchan_lk__);
+		}
 		release_kspinlock(&__tstchan_lk__);
 	}
 	else if (strcmp(utilityName, "__WakeupOne__") == 0)
@@ -293,13 +298,21 @@ void sys_utilities(char* utilityName, int value)
 	}
 	else if (strcmp(utilityName, "__GetChanQueueSize__") == 0)
 	{
-		int* numOfProcesses = (int*) value ;
-		*numOfProcesses = LIST_SIZE(&__tstchan__.queue);
+		acquire_kspinlock(&ProcessQueues.qlock);
+		{
+			int* numOfProcesses = (int*) value ;
+			*numOfProcesses = LIST_SIZE(&__tstchan__.queue);
+		}
+		release_kspinlock(&ProcessQueues.qlock);
 	}
 	else if (strcmp(utilityName, "__GetReadyQueueSize__") == 0)
 	{
-		int* numOfProcesses = (int*) value ;
-		*numOfProcesses = LIST_SIZE(&ProcessQueues.env_ready_queues[0]);
+		acquire_kspinlock(&ProcessQueues.qlock);
+		{
+			int* numOfProcesses = (int*) value ;
+			*numOfProcesses = LIST_SIZE(&ProcessQueues.env_ready_queues[0]);
+		}
+		release_kspinlock(&ProcessQueues.qlock);
 	}
 	else if (strcmp(utilityName, "__AcquireSleepLock__") == 0)
 	{
@@ -316,8 +329,13 @@ void sys_utilities(char* utilityName, int value)
 	}
 	else if (strcmp(utilityName, "__GetLockQueueSize__") == 0)
 	{
-		int* numOfProcesses = (int*) value ;
-		*numOfProcesses = LIST_SIZE(&__tstslplk__.chan.queue);
+		acquire_kspinlock(&ProcessQueues.qlock);
+		{
+			int* numOfProcesses = (int*) value ;
+			*numOfProcesses = LIST_SIZE(&__tstslplk__.chan.queue);
+			//cprintf("__GetLockQueueSize__ = %d\n", *numOfProcesses);
+		}
+		release_kspinlock(&ProcessQueues.qlock);
 	}
 	else if (strcmp(utilityName, "__GetLockValue__") == 0)
 	{
@@ -331,8 +349,12 @@ void sys_utilities(char* utilityName, int value)
 	}
 	else if (strcmp(utilityName, "__GetConsLockedCnt__") == 0)
 	{
-		uint32* consLockCnt = (uint32*) value ;
-		*consLockCnt = queue_size(&(conslock.chan.queue));
+		acquire_kspinlock(&ProcessQueues.qlock);
+		{
+			uint32* consLockCnt = (uint32*) value ;
+			*consLockCnt = queue_size(&(conslock.chan.queue));
+		}
+		release_kspinlock(&ProcessQueues.qlock);
 	}
 	else if (strcmp(utilityName, "__tmpReleaseConsLock__") == 0)
 	{
@@ -345,7 +367,7 @@ void sys_utilities(char* utilityName, int value)
 	/*else if (strcmp(utilityName, "__getKernelSBreak__") == 0)
 	{
 		uint32* ksbrk = (uint32*) value ;
-		*ksbrk = (uint32)sbrk(0);
+	 *ksbrk = (uint32)sbrk(0);
 	}*/
 	else if (strcmp(utilityName, "__changeInterruptStatus__") == 0)
 	{
@@ -428,6 +450,89 @@ void sys_utilities(char* utilityName, int value)
 			}
 		}
 	}
+	else if (strncmp(utilityName, "__CheckRefStream@", strlen("__CheckRefStream@")) == 0)
+	{
+#define MAX_REF_CNT 128
+		bool* correct = (bool*) value ;
+		*correct = 1;
+		int number_of_tokens;
+		char *tokens[MAX_REF_CNT];
+		strsplit(utilityName, "@", tokens, &number_of_tokens) ;
+		int numOfRefs = strtol(tokens[1], NULL, 10);
+		assert(numOfRefs < MAX_REF_CNT);
+		struct Env* env = get_cpu_proc() ;
+		if (numOfRefs != LIST_SIZE(&(env->referenceStreamList)))
+		{
+			cprintf("num of references MISMATCHED! Expected = %d, Actual = %d\n", numOfRefs, LIST_SIZE(&(env->referenceStreamList)));
+			*correct = 0;
+			return;
+		}
+
+		uint32 *expectedRefStream = (uint32 *)strtol(tokens[2], NULL, 10);
+
+		//Check the expected reference stream against the calculated one
+		struct PageRefElement *curRef = LIST_FIRST(&(env->referenceStreamList));
+		for (int i = 0; i < numOfRefs; ++i)
+		{
+			if (ROUNDDOWN(expectedRefStream[i], PAGE_SIZE) != ROUNDDOWN(curRef->virtual_address, PAGE_SIZE))
+			{
+				cprintf("Ref#%d MISMATCHED! Expected = %d, Actual = %d\n", ROUNDDOWN(expectedRefStream[i], PAGE_SIZE), ROUNDDOWN(curRef->virtual_address, PAGE_SIZE));
+				*correct = 0;
+				return;
+			}
+			curRef = LIST_NEXT(curRef);
+		}
+	}
+	else if (strcmp(utilityName, "__InvPage__") == 0)
+	{
+		uint32 va = (uint32) value ;
+		struct Env* env = get_cpu_proc() ;
+		env_page_ws_invalidate(env, va);
+	}
+	else if (strncmp(utilityName, "__NumOfSlaves@", strlen("__NumOfSlaves@")) == 0)
+	{
+		uint32* numOfSlaves = (uint32*) value ;
+
+		int number_of_tokens;
+		char *tokens[MAX_REF_CNT];
+		strsplit(utilityName, "@", tokens, &number_of_tokens) ;
+		if (strcmp(tokens[1], "Set") == 0)
+		{
+			__numOfSlaves = *numOfSlaves;
+		}
+		else if (strcmp(tokens[1], "Get") == 0)
+		{
+			*numOfSlaves = __numOfSlaves ;
+		}
+	}
+	else if (strncmp(utilityName, "__KSem@", strlen("__KSem@")) == 0)
+	{
+
+		int number_of_tokens;
+		char *tokens[MAX_REF_CNT];
+		strsplit(utilityName, "@", tokens, &number_of_tokens) ;
+		int semNum = strtol(tokens[1], NULL, 10);
+		//cprintf("%s - semNum = %d, action = %s\n", utilityName, semNum, tokens[2]);
+		if (strcmp(tokens[2], "Init") == 0)
+		{
+			char semName[10] ;
+			ltostr(semNum, semName);
+			init_ksemaphore(&(__ksems[semNum]), *((int*)value), semName);
+		}
+		else if (strcmp(tokens[2], "Wait") == 0)
+		{
+			wait_ksemaphore(&(__ksems[semNum]));
+		}
+		else if (strcmp(tokens[2], "Signal") == 0)
+		{
+			signal_ksemaphore(&(__ksems[semNum]));
+		}
+		if (strcmp(tokens[2], "Get") == 0)
+		{
+			int *val = ((int*)value);
+			*val = __ksems[semNum].count;
+		}
+	}
 
 	if ((int)value < 0)
 	{
@@ -469,7 +574,7 @@ void sys_utilities(char* utilityName, int value)
 		}
 	}
 	/*****************************************************************************************/
-
+#endif
 }
 /*=======================================*/
 void detect_loop_in_FrameInfo_list(struct FrameInfo_List* fi_list)

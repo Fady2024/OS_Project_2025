@@ -6,8 +6,6 @@
 #include <kern/cpu/sched.h>
 #include "../mem/memory_manager.h"
 
-extern int sys_calculate_free_frames();
-extern void sys_env_set_nice(int);
 
 #define INSTANCES_NUMBER 10
 #define TOTAL_TEST_VALUES 5
@@ -70,23 +68,26 @@ int find_in_range(int env_id, int start, int count)
 
 void test_bsd_nice_0()
 {
-	panic("Not Implemented");
+	panic("not implemented");
+
 }
 
 
 void test_bsd_nice_1()
 {
-	panic("Not Implemented");
+	panic("not implemented");
 }
 
 void test_bsd_nice_2()
 {
-	panic("Not Implemented");
+	panic("not implemented");
 }
 
 
 void test_priorityRR_0()
 {
+	int numOfIncorrect = 0;
+
 	if (firstTimeTest)
 	{
 		firstTimeTest = 0;
@@ -130,12 +131,12 @@ void test_priorityRR_0()
 			sched_new_env(env);
 		}
 		// print_order(prog_orders);
-		cprintf("> Running... (After all running programs finish, Run the same command again.)\n");
+		cprintf_colored(TEXT_light_cyan, "\n> Running... (After all running programs finish, Run the same command again.)\n");
 		execute_command("runall");
 	}
 	else
 	{
-		cprintf("> Checking...\n");
+		cprintf_colored(TEXT_light_cyan, "\n> Checking...\n");
 		sched_print_all();
 		// print_order(prog_orders);
 		int start_idx = 0;
@@ -145,17 +146,25 @@ void test_priorityRR_0()
 			{
 				int exist = find_in_range(prog_orders[i][j], start_idx, env_count[i]);
 				if (exist == -1)
-					panic("The programs' order of finishing is not correct\n");
+				{
+					//panic("The programs' order of finishing is not correct\n");
+					cprintf_colored(TEXT_TESTERR_CLR, "The finish order of program [%d] is not correct\n", prog_orders[i][j]);
+					numOfIncorrect++;
+				}
 			}
 			start_idx += env_count[i];
 		}
 		firstTimeTest = 0;
 	}
-	cprintf("\nCongratulations!! test_priorityRR_0 completed successfully.\n");
+
+	int eval = 100 - numOfIncorrect * 100 / TOTAL_TEST_VALUES;
+	cprintf_colored(TEXT_light_green, "\ntest_priorityRR_0 is finished. Eval = %d%\n", eval);
 }
 
 void test_priorityRR_1()
 {
+	int numOfIncorrect = 0;
+
 	if (firstTimeTest)
 	{
 		rsttst();
@@ -172,21 +181,21 @@ void test_priorityRR_1()
 		sched_new_env(fibPri0Env);
 		sched_new_env(fibPri4Env);
 		sched_new_env(fibPri2ParentEnv);
-		env_set_priority(fibPri2ParentEnv->env_id, 6);
+		env_set_priority(fibPri2ParentEnv->env_id, 4);
 
 		prog_orders[0][0] = fibPri0Env->env_id;
-		prog_orders[1][0] = fibPri4Env->env_id;
-		prog_orders[2][0] = fibPri2ParentEnv->env_id ; //id of the parent
-		prog_orders[3][0] = fibPri2ParentEnv->env_id + 1; //id of the 1st created child fib
+		prog_orders[1][0] = fibPri2ParentEnv->env_id ; //id of the parent
+		prog_orders[2][0] = fibPri2ParentEnv->env_id + 1; //id of the 1st created child fib
+		prog_orders[3][0] = fibPri4Env->env_id;
 		prog_orders[4][0] = fibPri8Env->env_id;
 		prog_orders[5][0] = fibPri2ParentEnv->env_id + 2; //id of the 2nd created child fib
 
-		cprintf("> Running... (After all running programs finish, Run the same command again.)\n");
+		cprintf_colored(TEXT_light_cyan, "\n> Running... (After all running programs finish, Run the same command again.)\n");
 		execute_command("runall");
 	}
 	else
 	{
-		cprintf("> Checking...\n");
+		cprintf_colored(TEXT_light_cyan, "\n> Checking...\n");
 		sched_print_all();
 		// print_order(prog_orders);
 		int i = 0;
@@ -199,19 +208,25 @@ void test_priorityRR_1()
 			for (; i < numOfExitEnvs; env = LIST_PREV(env))
 				//LIST_FOREACH_R(env, &env_exit_queue)
 			{
-				cprintf("%s - id=%d, priority=%d\n", env->prog_name, env->env_id, env->priority);
+				//cprintf("%s - id=%d, priority=%d\n", env->prog_name, env->env_id, env->priority);
 				if (prog_orders[i][0] != env->env_id)
-					panic("The programs' order of finishing is not correct\n");
+				{
+					cprintf_colored(TEXT_TESTERR_CLR, "The finish order of program [%d - %s] is not correct\n", env->env_id, env->prog_name);
+					numOfIncorrect++;
+				}
 				i++;
 			}
 		}
 		release_kspinlock(&ProcessQueues.qlock);
 	}
-	cprintf("\nCongratulations!! test_priorityRR_1 completed successfully.\n");
+	int eval = 100 - numOfIncorrect * 100 / 6;
+	cprintf_colored(TEXT_light_green, "\ntest_priorityRR_1 is finished. Eval = %d%\n", eval);
 }
 
 void test_priorityRR_2()
 {
+	int numOfIncorrect = 0;
+	int totalNumOfProcesses = 0;
 	if (firstTimeTest)
 	{
 		firstTimeTest = 0;
@@ -260,12 +275,12 @@ void test_priorityRR_2()
 			sched_new_env(env);
 		}
 		// print_order(prog_orders);
-		cprintf("> Running... (After all running programs finish, Run the same command again.)\n");
+		cprintf_colored(TEXT_light_cyan, "\n> Running... (After all running programs finish, Run the same command again.)\n");
 		execute_command("runall");
 	}
 	else
 	{
-		cprintf("> Checking...\n");
+		cprintf_colored(TEXT_light_cyan, "\n> Checking...\n");
 		sched_print_all();
 		// print_order(prog_orders);
 		int start_idx = 0;
@@ -275,9 +290,14 @@ void test_priorityRR_2()
 			{
 				for (int j = 0; j < INSTANCES_NUMBER - 2; j++)
 				{
+					totalNumOfProcesses++;
 					int exist = find_in_range(prog_orders[i][j], j, 1);
 					if (exist == -1)
-						panic("The programs' order of finishing is not correct\n");
+					{
+						//panic("The programs' order of finishing is not correct\n");
+						cprintf_colored(TEXT_TESTERR_CLR, "The finish order of program [%d] is not correct\n", prog_orders[i][j]);
+						numOfIncorrect++;
+					}
 				}
 				start_idx += env_count[i];
 			}
@@ -285,14 +305,21 @@ void test_priorityRR_2()
 			{
 				for (int j = 0; prog_orders[i][j] != 0; j++)
 				{
+					totalNumOfProcesses++;
 					int exist = find_in_range(prog_orders[i][j], start_idx, env_count[i]);
 					if (exist == -1)
-						panic("The programs' order of finishing is not correct\n");
+					{
+						//panic("The programs' order of finishing is not correct\n");
+						cprintf_colored(TEXT_TESTERR_CLR, "The finish order of program [%d] is not correct\n", prog_orders[i][j]);
+						numOfIncorrect++;
+					}
 				}
 				start_idx += env_count[i];
 			}
 		}
 		firstTimeTest = 0;
 	}
-	cprintf("\nCongratulations!! test_priorityRR_2 completed successfully.\n");
+	int eval = 100 - numOfIncorrect * 100 / totalNumOfProcesses;
+	cprintf("totalNumOfProcesses = %d\n ", totalNumOfProcesses);
+	cprintf_colored(TEXT_light_green, "\ntest_priorityRR_2 is finished. Eval = %d%\n", eval);
 }
