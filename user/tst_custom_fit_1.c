@@ -2,18 +2,18 @@
 /* MAKE SURE PAGE_WS_MAX_SIZE = 3000 */
 /* *********************************************************** */
 #include <inc/lib.h>
+#include <user/tst_malloc_helpers.h>
 
 void _main(void)
 {
 #if USE_KHEAP
 
-	panic("UPDATE IS REQUIRED");
-	sys_set_uheap_strategy(UHP_PLACE_FIRSTFIT);
+	sys_set_uheap_strategy(UHP_PLACE_CUSTOMFIT);
 
 	/*********************** NOTE ****************************
 	 * WE COMPARE THE DIFF IN FREE FRAMES BY "AT LEAST" RULE
 	 * INSTEAD OF "EQUAL" RULE SINCE IT'S POSSIBLE THAT SOME
-	 * PAGES ARE ALLOCATED IN DYNAMIC ALLOCATOR DUE TO sbrk()
+	 * PAGES ARE ALLOCATED IN BLOCK ALLOCATOR OF KERNEL/USER
 	 * (e.g. DURING THE DYNAMIC CREATION OF WS ELEMENT in FH).
 	 *********************************************************/
 
@@ -24,251 +24,217 @@ void _main(void)
 			panic("Please increase the WS size");
 	}
 	/*=================================================*/
-	int eval = 0;
-	bool is_correct = 1;
+	int correct = 1;
+	int eval;
+	int expectedNumOfTables;
 
-	uint32 pagealloc_start = USER_HEAP_START + DYN_ALLOC_MAX_SIZE + PAGE_SIZE; //UHS + 32MB + 4KB
-
-	int Mega = 1024*1024;
-	int kilo = 1024;
-	void* ptr_allocations[20] = {0};
-	int freeFrames ;
-	int usedDiskPages;
-	//[1] Allocate set of blocks
-	cprintf("\n%~[1] Allocate spaces of different sizes in PAGE ALLOCATOR\n");
+	//1. Alloc some spaces in PAGE allocator
+	cprintf_colored(TEXT_cyan,"%~\n1. Alloc some spaces in PAGE allocator\n");
 	{
-		//Allocate 1 MB
-		freeFrames = sys_calculate_free_frames() ;
-		usedDiskPages = sys_pf_calculate_allocated_pages();
-		ptr_allocations[0] = malloc(1*Mega-kilo);
-		if ((uint32) ptr_allocations[0] != (pagealloc_start)) { is_correct = 0; cprintf("Wrong start address for the allocated space... \n");}
-		//if ((freeFrames - sys_calculate_free_frames()) != 256+1 ) { is_correct = 0; cprintf("Wrong allocation: \n");}
-		if( (sys_pf_calculate_allocated_pages() - usedDiskPages) !=  0) { is_correct = 0; cprintf("Wrong page file allocation: \n");}
-
-		//Allocate 1 MB
-		freeFrames = sys_calculate_free_frames() ;
-		usedDiskPages = sys_pf_calculate_allocated_pages();
-		ptr_allocations[1] = malloc(1*Mega-kilo);
-		if ((uint32) ptr_allocations[1] != (pagealloc_start + 1*Mega)) { is_correct = 0; cprintf("Wrong start address for the allocated space... \n");}
-		//if ((freeFrames - sys_calculate_free_frames()) != 256 ) { is_correct = 0; cprintf("Wrong allocation: \n");}
-		if( (sys_pf_calculate_allocated_pages() - usedDiskPages) !=  0) { is_correct = 0; cprintf("Wrong page file allocation: \n");}
-
-		//Allocate 1 MB
-		freeFrames = sys_calculate_free_frames() ;
-		usedDiskPages = sys_pf_calculate_allocated_pages();
-		ptr_allocations[2] = malloc(1*Mega-kilo);
-		if ((uint32) ptr_allocations[2] != (pagealloc_start + 2*Mega)) { is_correct = 0; cprintf("Wrong start address for the allocated space... \n");}
-		//if ((freeFrames - sys_calculate_free_frames()) != 256 ) { is_correct = 0; cprintf("Wrong allocation: \n");}
-		if( (sys_pf_calculate_allocated_pages() - usedDiskPages) !=  0) { is_correct = 0; cprintf("Wrong page file allocation: \n");}
-
-		//Allocate 1 MB
-		freeFrames = sys_calculate_free_frames() ;
-		usedDiskPages = sys_pf_calculate_allocated_pages();
-		ptr_allocations[3] = malloc(1*Mega-kilo);
-		if ((uint32) ptr_allocations[3] != (pagealloc_start + 3*Mega) ) { is_correct = 0; cprintf("Wrong start address for the allocated space... \n");}
-		//if ((freeFrames - sys_calculate_free_frames()) != 256 ) { is_correct = 0; cprintf("Wrong allocation: \n");}
-		if( (sys_pf_calculate_allocated_pages() - usedDiskPages) !=  0) { is_correct = 0; cprintf("Wrong page file allocation: \n");}
-
-		//Allocate 2 MB
-		freeFrames = sys_calculate_free_frames() ;
-		usedDiskPages = sys_pf_calculate_allocated_pages();
-		ptr_allocations[4] = malloc(2*Mega-kilo);
-		if ((uint32) ptr_allocations[4] != (pagealloc_start + 4*Mega)) { is_correct = 0; cprintf("Wrong start address for the allocated space... \n");}
-		//if ((freeFrames - sys_calculate_free_frames()) != 512 + 1) { is_correct = 0; cprintf("Wrong allocation: \n");}
-		if( (sys_pf_calculate_allocated_pages() - usedDiskPages) !=  0) { is_correct = 0; cprintf("Wrong page file allocation: \n");}
-
-		//Allocate 2 MB
-		freeFrames = sys_calculate_free_frames() ;
-		usedDiskPages = sys_pf_calculate_allocated_pages();
-		ptr_allocations[5] = malloc(2*Mega-kilo);
-		if ((uint32) ptr_allocations[5] != (pagealloc_start + 6*Mega)) { is_correct = 0; cprintf("Wrong start address for the allocated space... \n");}
-		//if ((freeFrames - sys_calculate_free_frames()) != 512) { is_correct = 0; cprintf("Wrong allocation: \n");}
-		if( (sys_pf_calculate_allocated_pages() - usedDiskPages) !=  0) { is_correct = 0; cprintf("Wrong page file allocation: \n");}
-
-		//Allocate 3 MB
-		freeFrames = sys_calculate_free_frames() ;
-		usedDiskPages = sys_pf_calculate_allocated_pages();
-		ptr_allocations[6] = malloc(3*Mega-kilo);
-		if ((uint32) ptr_allocations[6] != (pagealloc_start + 8*Mega)) { is_correct = 0; cprintf("Wrong start address for the allocated space... \n");}
-		//if ((freeFrames - sys_calculate_free_frames()) != 768 + 1) { is_correct = 0; cprintf("Wrong allocation: \n");}
-		if( (sys_pf_calculate_allocated_pages() - usedDiskPages) !=  0) { is_correct = 0; cprintf("Wrong page file allocation: \n");}
-
-		//Allocate 3 MB
-		freeFrames = sys_calculate_free_frames() ;
-		usedDiskPages = sys_pf_calculate_allocated_pages();
-		ptr_allocations[7] = malloc(3*Mega-kilo);
-		if ((uint32) ptr_allocations[7] != (pagealloc_start + 11*Mega)) { is_correct = 0; cprintf("Wrong start address for the allocated space... \n");}
-		//if ((freeFrames - sys_calculate_free_frames()) != 768 + 1) { is_correct = 0; cprintf("Wrong allocation: \n");}
-		if( (sys_pf_calculate_allocated_pages() - usedDiskPages) !=  0) { is_correct = 0; cprintf("Wrong page file allocation: \n");}
+		eval = initial_page_allocations();
+		if (eval != 100)
+		{
+			cprintf_colored(TEXT_TESTERR_CLR,"initial allocations are not correct!\nplease make sure the the kmalloc test is correct before testing the kfree\n");
+			return ;
+		}
 	}
+	eval = 0;
 
-	//[2] Free some to create holes
-	cprintf("\n%~[2] Free some to create holes [10%]\n");
+	//2. Free some allocations to create initial holes
+	cprintf_colored(TEXT_cyan,"%~\n2. Free some allocations to create initial holes [5%]\n");
+	correct = 1;
 	{
-		//1 MB Hole
-		freeFrames = sys_calculate_free_frames() ;
-		usedDiskPages = sys_pf_calculate_allocated_pages();
-		free(ptr_allocations[1]);
-		//if ((sys_calculate_free_frames() - freeFrames) != 256) { is_correct = 0; cprintf("Wrong free: \n");}
-		if( (usedDiskPages - sys_pf_calculate_allocated_pages()) !=  0) { is_correct = 0; cprintf("Wrong page file free: \n");}
-		if ((sys_calculate_free_frames() - freeFrames) != 0) { is_correct = 0; cprintf("Wrong free: \n");}
-
-		//2 MB Hole
-		freeFrames = sys_calculate_free_frames() ;
-		usedDiskPages = sys_pf_calculate_allocated_pages();
-		free(ptr_allocations[4]);
-		//if ((sys_calculate_free_frames() - freeFrames) != 512) { is_correct = 0; cprintf("Wrong free: \n");}
-		if( (usedDiskPages - sys_pf_calculate_allocated_pages()) !=  0) { is_correct = 0; cprintf("Wrong page file free: \n");}
-		if ((sys_calculate_free_frames() - freeFrames) != 0) { is_correct = 0; cprintf("Wrong free: \n");}
-
 		//3 MB Hole
-		freeFrames = sys_calculate_free_frames() ;
-		usedDiskPages = sys_pf_calculate_allocated_pages();
-		free(ptr_allocations[6]);
-		//if ((sys_calculate_free_frames() - freeFrames) != 768) { is_correct = 0; cprintf("Wrong free: \n");}
-		if( (usedDiskPages - sys_pf_calculate_allocated_pages()) !=  0) { is_correct = 0; cprintf("Wrong page file free: \n");}
-		if ((sys_calculate_free_frames() - freeFrames) != 0) { is_correct = 0; cprintf("Wrong free: \n");}
+		correct = freeSpaceInPageAlloc(1, 1);
+
+		//2nd 4 MB Hole
+		correct = freeSpaceInPageAlloc(3, 1);
+
+		//2nd 1 MB Hole
+		correct = freeSpaceInPageAlloc(5, 1);
+
+		//2nd 2 MB Hole
+		correct = freeSpaceInPageAlloc(7, 1);
 	}
-	if (is_correct)
+	if (correct) eval += 5;
+	correct = 1;
+
+	//3. Check content of un-freed spaces
+	uint32 sums[MAX_NUM_OF_ALLOCS] = {0};
+	cprintf_colored(TEXT_cyan,"%~\n3. Check content of un-freed spaces [5%]\n");
 	{
-		eval += 10;
-	}
-	is_correct = 1;
-	//[3] Allocate again [test first fit]
-	cprintf("\n%~[3] Allocate again [test first fit] [50%]\n");
-	{
-		//Allocate 512 KB - should be placed in 1st hole
-		freeFrames = sys_calculate_free_frames() ;
-		usedDiskPages = sys_pf_calculate_allocated_pages();
-		ptr_allocations[8] = malloc(512*kilo - kilo);
-		if ((uint32) ptr_allocations[8] != (pagealloc_start + 1*Mega)) { is_correct = 0; cprintf("Wrong start address for the allocated space... \n");}
-		//if ((freeFrames - sys_calculate_free_frames()) != 128) { is_correct = 0; cprintf("Wrong allocation: \n");}
-		if( (sys_pf_calculate_allocated_pages() - usedDiskPages) !=  0) { is_correct = 0; cprintf("Wrong page file allocation: \n");}
-		if (is_correct)
+		for (int i = 0; i < allocIndex; ++i)
 		{
-			eval += 10;
+			//skip the freed spaces
+			if (i == 1 || i == 3 || i == 5 || i == 7)
+				continue;
+			char* ptr = (char*)ptr_allocations[i];
+			sums[i] += ptr[0] ;
+			sums[i] += ptr[lastIndices[i]] ;
+			if (sums[i] != (maxByte + maxByte))
+			{ correct = 0; cprintf_colored(TEXT_TESTERR_CLR,"invalid content in alloc#%d. Expected = %d, Actual = %d\n", i, 2*maxByte, sums[i]); }
 		}
-		is_correct = 1;
-		//Allocate 1 MB - should be placed in 2nd hole
-		freeFrames = sys_calculate_free_frames() ;
-		usedDiskPages = sys_pf_calculate_allocated_pages();
-		ptr_allocations[9] = malloc(1*Mega - kilo);
-		if ((uint32) ptr_allocations[9] != (pagealloc_start + 4*Mega)) { is_correct = 0; cprintf("Wrong start address for the allocated space... \n");}
-		//if ((freeFrames - sys_calculate_free_frames()) != 256) { is_correct = 0; cprintf("Wrong allocation: \n");}
-		if( (sys_pf_calculate_allocated_pages() - usedDiskPages) !=  0) { is_correct = 0; cprintf("Wrong page file allocation: \n");}
-		if (is_correct)
+	}
+	if (correct) eval += 5;
+	correct = 1;
+
+	//4. Check BREAK
+	correct = 1;
+	uint32 expectedBreak = 0;
+	cprintf_colored(TEXT_cyan,"%~\n4. Check BREAK [5%]\n");
+	{
+		expectedBreak = ACTUAL_PAGE_ALLOC_START + totalRequestedSize;
+		if(uheapPageAllocBreak != expectedBreak)
+		{correct = 0; cprintf_colored(TEXT_TESTERR_CLR,"BREAK value is not correct! Expected = %x, Actual = %x\n", expectedBreak, uheapPageAllocBreak);}
+	}
+	if (correct) eval += 5;
+	correct = 1;
+
+	//5. Allocate after kfree [Test CUSTOM FIT]
+	uint32 allocIndex,expectedVA, size = 0;
+	cprintf_colored(TEXT_cyan,"%~\n5. Allocate after free [Test CUSTOM FIT] [30%]\n");
+	{
+		//1 MB [EXACT FIT in 1MB Hole (alloc#5)]
+		allocIndex = 14;
+		size = 1*Mega - kilo;
+		expectedNumOfTables = 0;
+		correct = allocSpaceInPageAlloc(allocIndex, size, 1, expectedNumOfTables);
+		expectedVA = (uint32)ptr_allocations[5] ; //Address of 1MB Hole
+		if ((uint32) ptr_allocations[allocIndex] != (expectedVA)) { correct = 0; cprintf_colored(TEXT_TESTERR_CLR,"%d.3 Wrong start address for the allocated space... Expected = %x, Actual = %x\n", allocIndex, expectedVA, ptr_allocations[allocIndex]); }
+
+		//1MB + 4KB [WORST FIT in 4MB Hole (alloc#3)]
+		allocIndex = 15;
+		size = 1*Mega + 4*kilo;
+		expectedNumOfTables = 0;
+		correct = allocSpaceInPageAlloc(allocIndex, size, 1, expectedNumOfTables);
+		expectedVA = (uint32)ptr_allocations[3] ; //Address of 4MB Hole
+		if ((uint32) ptr_allocations[allocIndex] != (expectedVA)) { correct = 0; cprintf_colored(TEXT_TESTERR_CLR,"%d.3 Wrong start address for the allocated space... Expected = %x, Actual = %x\n", allocIndex, expectedVA, ptr_allocations[allocIndex]); }
+
+		//3MB - 4KB [EXACT FIT in remaining area of 4MB Hole (alloc#3)]
+		allocIndex = 16;
+		size = 3*Mega - 4*kilo;
+		expectedNumOfTables = 0;
+		correct = allocSpaceInPageAlloc(allocIndex, size, 1, expectedNumOfTables);
+		expectedVA = (uint32)ptr_allocations[3] + 1*Mega + 4*kilo; //1MB.4KB after the Start Address of 4MB Hole
+		if ((uint32) ptr_allocations[allocIndex] != (expectedVA)) { correct = 0; cprintf_colored(TEXT_TESTERR_CLR,"%d.3 Wrong start address for the allocated space... Expected = %x, Actual = %x\n", allocIndex, expectedVA, ptr_allocations[allocIndex]); }
+
+		//1.5 MB [WORST FIT in 3MB Hole (alloc#1)]
+		allocIndex = 17;
+		size = 1*Mega + Mega/2;
+		expectedNumOfTables = 0;
+		correct = allocSpaceInPageAlloc(allocIndex, size, 1, expectedNumOfTables);
+		expectedVA = (uint32)ptr_allocations[1] ; //Address of 3MB Hole
+		if ((uint32) ptr_allocations[allocIndex] != (expectedVA)) { correct = 0; cprintf_colored(TEXT_TESTERR_CLR,"%d.3 Wrong start address for the allocated space... Expected = %x, Actual = %x\n", allocIndex, expectedVA, ptr_allocations[allocIndex]); }
+
+		//2.5 MB [EXTEND THE BREAK]
+		allocIndex = 18;
+		size = 2*Mega + Mega/2;
+		expectedNumOfTables = 0;
+		correct = allocSpaceInPageAlloc(allocIndex, size, 1, expectedNumOfTables);
+		expectedVA = expectedBreak ;
+		expectedBreak += ROUNDUP(size, PAGE_SIZE);
+		if ((uint32) ptr_allocations[allocIndex] != (expectedVA))
+		{ correct = 0; cprintf_colored(TEXT_TESTERR_CLR,"%d.3 Wrong start address for the allocated space... Expected = %x, Actual = %x\n", allocIndex, expectedVA, ptr_allocations[allocIndex]); }
+		if(uheapPageAllocBreak != expectedBreak)
+		{correct = 0; cprintf_colored(TEXT_TESTERR_CLR,"BREAK value is not correct! Expected = %x, Actual = %x\n", expectedBreak, uheapPageAllocBreak);}
+
+		//Insufficient space
+		allocIndex = 19;
+		expectedVA = 0;
+		int freeFrames = (int)sys_calculate_free_frames() ;
+		int usedDiskFrames = (int)sys_pf_calculate_allocated_pages() ;
+		uint32 restOfUHeap = (USER_HEAP_MAX - ACTUAL_PAGE_ALLOC_START) - expectedBreak ;
+		ptr_allocations[allocIndex] = malloc(restOfUHeap+1);
+		if (ptr_allocations[allocIndex] != NULL)
+		{ correct = 0; cprintf_colored(TEXT_TESTERR_CLR,"%d.1 Allocating insufficient space: should return NULL\n", allocIndex); }
+		if (((int)sys_pf_calculate_allocated_pages() - usedDiskFrames) != 0)
+		{ correct = 0; cprintf_colored(TEXT_TESTERR_CLR,"%d.2 Page file is changed while it's not expected to. (pages are wrongly allocated/de-allocated in PageFile)\n", allocIndex); }
+		if ((freeFrames - (int)sys_calculate_free_frames()) != 0)
+		{ correct = 0; cprintf_colored(TEXT_TESTERR_CLR,"%d.3 Wrong allocation: pages are not loaded successfully into memory\n", allocIndex); }
+	}
+	if (correct) eval+=30;
+	correct = 1;
+
+	//6. Check content of newly allocated spaces
+	cprintf_colored(TEXT_cyan,"%~\n6. Check content of newly allocated spaces [10%]\n");
+	{
+		for (int i = 14; i < allocIndex; ++i)
 		{
-			eval += 10;
+			char* ptr = (char*)ptr_allocations[i];
+			sums[i] += ptr[0] ;
+			sums[i] += ptr[lastIndices[i]] ;
+			if (sums[i] != (maxByte + maxByte))
+			{ correct = 0; cprintf_colored(TEXT_TESTERR_CLR,"invalid content in alloc#%d. Expected = %d, Actual = %d\n", i, 2*maxByte, sums[i]); }
 		}
-		is_correct = 1;
-
-		//Allocate 256 KB - should be placed in remaining of 1st hole
-		freeFrames = sys_calculate_free_frames() ;
-		usedDiskPages = sys_pf_calculate_allocated_pages();
-		ptr_allocations[10] = malloc(256*kilo - kilo);
-		if ((uint32) ptr_allocations[10] != (pagealloc_start + 1*Mega + 512*kilo)) { is_correct = 0; cprintf("Wrong start address for the allocated space... \n");}
-		//if ((freeFrames - sys_calculate_free_frames()) != 64) { is_correct = 0; cprintf("Wrong allocation: \n");}
-		if( (sys_pf_calculate_allocated_pages() - usedDiskPages) !=  0) { is_correct = 0; cprintf("Wrong page file allocation: \n");}
-		if (is_correct)
-		{
-			eval += 10;
-		}
-		is_correct = 1;
-
-		//Allocate 2 MB - should be placed in 3rd hole
-		freeFrames = sys_calculate_free_frames() ;
-		usedDiskPages = sys_pf_calculate_allocated_pages();
-		ptr_allocations[11] = malloc(2*Mega);
-		if ((uint32) ptr_allocations[11] != (pagealloc_start + 8*Mega)) { is_correct = 0; cprintf("Wrong start address for the allocated space... \n");}
-		//if ((freeFrames - sys_calculate_free_frames()) != 256) { is_correct = 0; cprintf("Wrong allocation: \n");}
-		if( (sys_pf_calculate_allocated_pages() - usedDiskPages) !=  0) { is_correct = 0; cprintf("Wrong page file allocation: \n");}
-		if (is_correct)
-		{
-			eval += 10;
-		}
-		is_correct = 1;
-
-		//Allocate 4 MB - should be placed in end of all allocations
-		freeFrames = sys_calculate_free_frames() ;
-		usedDiskPages = sys_pf_calculate_allocated_pages();
-		ptr_allocations[12] = malloc(4*Mega - kilo);
-		if ((uint32) ptr_allocations[12] != (pagealloc_start + 14*Mega) ) { is_correct = 0; cprintf("Wrong start address for the allocated space... \n");}
-		//if ((freeFrames - sys_calculate_free_frames()) != 1024 + 1) { is_correct = 0; cprintf("Wrong allocation: \n");}
-		if( (sys_pf_calculate_allocated_pages() - usedDiskPages) !=  0) { is_correct = 0; cprintf("Wrong page file allocation: \n");}
-		if (is_correct)
-		{
-			eval += 10;
-		}
-		is_correct = 1;
 	}
+	if (correct) eval += 10;
+	correct = 1;
 
-	is_correct = 1;
-	//[4] Free contiguous allocations
-	cprintf("\n%~[4] Free contiguous allocations [10%]\n");
+	//7. Free some allocations to create MERGED holes
+	correct = 1;
+	cprintf_colored(TEXT_cyan,"%~\n7. Free some allocations to create MERGED holes [5%]\n");
 	{
-		//1 MB Hole appended to previous 256 KB hole
-		freeFrames = sys_calculate_free_frames() ;
-		usedDiskPages = sys_pf_calculate_allocated_pages();
-		free(ptr_allocations[2]);
-		//if ((sys_calculate_free_frames() - freeFrames) != 256) { is_correct = 0; cprintf("Wrong free: \n");}
-		if( (usedDiskPages - sys_pf_calculate_allocated_pages()) !=  0) { is_correct = 0; cprintf("Wrong page file free: \n");}
-		if ((sys_calculate_free_frames() - freeFrames) != 0) { is_correct = 0; cprintf("Wrong free: \n");}
+		//Free new 3MB allocation inside the 4MB Hole
+		correct = freeSpaceInPageAlloc(16,1);
 
-		//1 MB Hole appended to next 1 MB hole
-		freeFrames = sys_calculate_free_frames() ;
-		usedDiskPages = sys_pf_calculate_allocated_pages();
-		free(ptr_allocations[9]);
-		//if ((sys_calculate_free_frames() - freeFrames) != 256) { is_correct = 0; cprintf("Wrong free: \n");}
-		if( (usedDiskPages - sys_pf_calculate_allocated_pages()) !=  0) { is_correct = 0; cprintf("Wrong page file free: \n");}
-		if ((sys_calculate_free_frames() - freeFrames) != 0) { is_correct = 0; cprintf("Wrong free: \n");}
+		//Free new 1MB allocation at the beginning of the 4MB Hole (should be MERGED with next 3MB) => 4MB HOLE
+		correct = freeSpaceInPageAlloc(15,1);
 
-		//1 MB Hole appended to previous 1 MB + 256 KB hole and next 2 MB hole [Total = 4 MB + 256 KB]
-		freeFrames = sys_calculate_free_frames() ;
-		usedDiskPages = sys_pf_calculate_allocated_pages();
-		free(ptr_allocations[3]);
-		//if ((sys_calculate_free_frames() - freeFrames) != 256) { is_correct = 0; cprintf("Wrong free: \n");}
-		if( (usedDiskPages - sys_pf_calculate_allocated_pages()) !=  0) { is_correct = 0; cprintf("Wrong page file free: \n");}
-		if ((sys_calculate_free_frames() - freeFrames) != 0) { is_correct = 0; cprintf("Wrong free: \n");}
-	}
-	if (is_correct)
-	{
-		eval += 10;
-	}
-	is_correct = 1;
-	//[5] Allocate again [test first fit]
-	cprintf("\n%~[5] Allocate again [test first fit in coalesced area] [15%]\n");
-	{
-		//[FIRST FIT Case]
-		//Allocate 4 MB + 256 KB - should be placed in the contiguous hole (256 KB + 4 MB)
-		freeFrames = sys_calculate_free_frames() ;
-		usedDiskPages = sys_pf_calculate_allocated_pages();
-		ptr_allocations[13] = malloc(4*Mega + 256*kilo - kilo);
-		if ((uint32) ptr_allocations[13] != (pagealloc_start + 1*Mega + 768*kilo)) { is_correct = 0; cprintf("Wrong start address for the allocated space... \n");}
-		//if ((freeFrames - sys_calculate_free_frames()) != 512+32) { is_correct = 0; cprintf("Wrong allocation: \n");}
-		if( (sys_pf_calculate_allocated_pages() - usedDiskPages) !=  0) { is_correct = 0; cprintf("Wrong page file allocation: \n");}
-	}
-	if (is_correct)
-	{
-		eval += 15;
-	}
-	is_correct = 1;
-	//[6] Attempt to allocate large segment with no suitable fragment to fit on
-	cprintf("\n%~[6] Attempt to allocate large segment with no suitable fragment to fit on [15%]\n");
-	{
-		//Large Allocation
-		//int freeFrames = sys_calculate_free_frames() ;
-		//usedDiskPages = sys_pf_calculate_allocated_pages();
-		ptr_allocations[9] = malloc((USER_HEAP_MAX - pagealloc_start - 18*Mega + 1));
-		if (ptr_allocations[9] != NULL) { is_correct = 0; cprintf("Malloc: Attempt to allocate large segment with no suitable fragment to fit on, should return NULL\n");}
+		//Free new 1MB allocation at the beginning of the 3MB Hole (should be MERGED with next 1.5MB) => 3MB HOLE
+		correct = freeSpaceInPageAlloc(17,1);
 
+		//Free new 1MB allocation at the 1MB Hole (NO MERGED)
+		correct = freeSpaceInPageAlloc(14,1);
+
+		//Free original 3rd 1MB allocation (should be MERGED with next 2MB hole and the prev 1MB hole) => 4MB HOLE
+		correct = freeSpaceInPageAlloc(6,1);
+
+		//Free original last 2MB allocation (should be MERGED with the prev 4MB created hole) => 6MB HOLE
+		correct = freeSpaceInPageAlloc(8,1);
 	}
-	if (is_correct)
+	if (correct) eval += 5;
+	correct = 1;
+
+	//8. Allocate after kfree [Test CUSTOM FIT in MERGED FREE SPACES]
+	cprintf_colored(TEXT_cyan,"%~\n8. Allocate after free [Test CUSTOM FIT in MERGED FREE SPACES] [40%]\n");
 	{
-		eval += 15;
+		//3 MB [EXACT FIT in 3MB Hole]
+		allocIndex = 20;
+		size = 3*Mega - kilo;
+		expectedNumOfTables = 0;
+		correct = allocSpaceInPageAlloc(allocIndex, size, 1, expectedNumOfTables);
+		expectedVA = (uint32)ptr_allocations[1] ; //Address of 3MB Hole
+		if ((uint32) ptr_allocations[allocIndex] != (expectedVA)) { correct = 0; cprintf_colored(TEXT_TESTERR_CLR,"%d.3 Wrong start address for the allocated space... Expected = %x, Actual = %x\n", allocIndex, expectedVA, ptr_allocations[allocIndex]); }
+
+		//3 MB [WORST FIT in 6MB Hole]
+		allocIndex = 21;
+		size = 3*Mega - kilo;
+		expectedNumOfTables = 0;
+		correct = allocSpaceInPageAlloc(allocIndex, size, 1, expectedNumOfTables);
+		expectedVA = (uint32)ptr_allocations[5] ; //Address of 6MB Hole
+		if ((uint32) ptr_allocations[allocIndex] != (expectedVA)) { correct = 0; cprintf_colored(TEXT_TESTERR_CLR,"%d.3 Wrong start address for the allocated space... Expected = %x, Actual = %x\n", allocIndex, expectedVA, ptr_allocations[allocIndex]); }
+
+		//3MB - 4KB [WORST FIT in 4MB Hole]
+		allocIndex = 22;
+		size = 3*Mega - 4*kilo;
+		expectedNumOfTables = 0;
+		correct = allocSpaceInPageAlloc(allocIndex, size, 1, expectedNumOfTables);
+		expectedVA = (uint32)ptr_allocations[3] ; //Address of 4MB Hole
+		if ((uint32) ptr_allocations[allocIndex] != (expectedVA)) { correct = 0; cprintf_colored(TEXT_TESTERR_CLR,"%d.3 Wrong start address for the allocated space... Expected = %x, Actual = %x\n", allocIndex, expectedVA, ptr_allocations[allocIndex]); }
+
+		//3 MB [EXACT FIT in remaining of 6MB Hole]
+		allocIndex = 23;
+		size = 3*Mega;
+		expectedNumOfTables = 0;
+		correct = allocSpaceInPageAlloc(allocIndex, size, 1, expectedNumOfTables);
+		expectedVA = (uint32)ptr_allocations[5] + 3*Mega ; //3MB after the start address of 6MB Hole
+		if ((uint32) ptr_allocations[allocIndex] != (expectedVA)) { correct = 0; cprintf_colored(TEXT_TESTERR_CLR,"%d.3 Wrong start address for the allocated space... Expected = %x, Actual = %x\n", allocIndex, expectedVA, ptr_allocations[allocIndex]); }
 	}
-	is_correct = 1;
-	cprintf("%~\ntest FIRST FIT (1) [PAGE ALLOCATOR] completed. Eval = %d\n\n", eval);
-	//cprintf("[AUTO_GR@DING_PARTIAL]%d\n", eval);
+	if (correct) eval += 40;
+	correct = 1;
+
+
+	cprintf_colored(TEXT_light_green, "%~\ntest CUSTOM FIT (1) [PAGE ALLOCATOR] completed. Eval = %d\n\n", eval);
 
 	return;
 #endif

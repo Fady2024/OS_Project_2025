@@ -20,7 +20,7 @@ void _main(void)
 		arr[i] = -1 ;
 
 
-	cprintf("checking REPLACEMENT fault handling of STACK pages... \n");
+	cprintf_colored(TEXT_cyan, "%~\nchecking REPLACEMENT fault handling of STACK pages... \n");
 	{
 		for (i = 0 ; i < PAGE_SIZE*10 ; i+=PAGE_SIZE/2)
 			if( arr[i] != -1) panic("modified stack page(s) not restored correctly");
@@ -30,7 +30,7 @@ void _main(void)
 		if( (freePages - (sys_calculate_free_frames() + sys_calculate_modified_frames())) != 0 ) panic("Extra memory are wrongly allocated... It's REplacement: expected that no extra frames are allocated");
 	}//consider tables of PF, disk pages
 
-	cprintf("Congratulations: stack pages created, modified and read is completed successfully\n\n");
+	cprintf_colored(TEXT_light_green, "%~\nCongratulations: stack pages created, modified and read is completed successfully\n\n");
 
 
 	return;

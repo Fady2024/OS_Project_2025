@@ -5,7 +5,6 @@
 void
 _main(void)
 {
-	panic("UPDATE IS REQUIRED");
 	int envID = sys_getenvid();
 	char line[256] ;
 	readline("Enter total number of customers: ", line) ;
@@ -13,32 +12,47 @@ _main(void)
 	readline("Enter shop capacity: ", line) ;
 	int shopCapacity = strtol(line, NULL, 10);
 
-	struct semaphore shopCapacitySem = create_semaphore("shopCapacity", shopCapacity);
-	struct semaphore dependSem = create_semaphore("depend", 0);
+	int semVal ;
+	//Initialize the kernel semaphores
+	char initCmd1[64] = "__KSem@0@Init";
+	char initCmd2[64] = "__KSem@1@Init";
+	semVal = shopCapacity;
+	sys_utilities(initCmd1, (uint32)(&semVal));
+	semVal = 0;
+	sys_utilities(initCmd2, (uint32)(&semVal));
 
 	int i = 0 ;
 	int id ;
 	for (; i<totalNumOfCusts; i++)
 	{
-		id = sys_create_env("sem2Slave", (myEnv->page_WS_max_size), (myEnv->SecondListSize),(myEnv->percentage_of_WS_pages_to_be_removed));
+		id = sys_create_env("ksem2Slave", (myEnv->page_WS_max_size), (myEnv->SecondListSize),(myEnv->percentage_of_WS_pages_to_be_removed));
 		if (id == E_ENV_CREATION_ERROR)
 			panic("NO AVAILABLE ENVs... Please reduce the number of customers and try again...");
 		sys_run_env(id) ;
 	}
 
+	//Wait until all finished
 	for (i = 0 ; i<totalNumOfCusts; i++)
 	{
-		wait_semaphore(dependSem);
+		char waitCmd[64] = "__KSem@1@Wait";
+		sys_utilities(waitCmd, 0);
 	}
-	int sem1val = semaphore_count(shopCapacitySem);
-	int sem2val = semaphore_count(dependSem);
+
+	//Check semaphore values
+	int sem1val ;
+	int sem2val ;
+	char getCmd1[64] = "__KSem@0@Get";
+	char getCmd2[64] = "__KSem@1@Get";
+
+	sys_utilities(getCmd1, (uint32)(&sem1val));
+	sys_utilities(getCmd2, (uint32)(&sem2val));
 
 	//wait a while to allow the slaves to finish printing their closing messages
 	env_sleep(10000);
 	if (sem2val == 0 && sem1val == shopCapacity)
-		cprintf("\nCongratulations!! Test of Semaphores [2] completed successfully!!\n\n\n");
+		cprintf_colored(TEXT_light_green,"\nCongratulations!! Test of Semaphores [2] completed successfully!!\n\n\n");
 	else
-		cprintf("\nError: wrong semaphore value... please review your semaphore code again...\n");
+		cprintf_colored(TEXT_TESTERR_CLR,"\nError: wrong semaphore value... please review your semaphore code again...\n");
 
 	return;
 }

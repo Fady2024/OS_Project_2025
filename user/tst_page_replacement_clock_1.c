@@ -7,37 +7,36 @@
 char __arr__[PAGE_SIZE*12];
 char* __ptr__ = (char* )0x0801000 ;
 char* __ptr2__ = (char* )0x0804000 ;
-
+uint32 expectedInitialVAs[11] = {
+		0x800000, 0x801000, 0x802000,		//Code
+		0x803000,0x804000,0x805000,0x806000,0x807000,0x808000,0x809000, 	//Data
+		0xeebfd000, 	//Stack
+} ;
+uint32 expectedFinalVAs[11] = {
+		0xeebfd000, 	//Stack
+		0x800000, 0x809000, 0x80a000, 0x803000, 0x801000, 0x804000, 0x80b000, 0x80c000, 0x827000, 0x802000, 	//Code & Data
+} ;
 void _main(void)
 {
-
-	panic("UPDATE IS REQUIRED");
-
-
-
-
 	//("STEP 0: checking Initial WS entries ...\n");
-	{
-		if( ROUNDDOWN(myEnv->__uptr_pws[0].virtual_address,PAGE_SIZE) !=   0x200000)  	panic("INITIAL PAGE WS entry checking failed! Review size of the WS..!!");
-		if( ROUNDDOWN(myEnv->__uptr_pws[1].virtual_address,PAGE_SIZE) !=   0x201000)  panic("INITIAL PAGE WS entry checking failed! Review size of the WS..!!");
-		if( ROUNDDOWN(myEnv->__uptr_pws[2].virtual_address,PAGE_SIZE) !=   0x202000)  panic("INITIAL PAGE WS entry checking failed! Review size of the WS..!!");
-		if( ROUNDDOWN(myEnv->__uptr_pws[3].virtual_address,PAGE_SIZE) !=   0x203000)  panic("INITIAL PAGE WS entry checking failed! Review size of the WS..!!");
-		if( ROUNDDOWN(myEnv->__uptr_pws[4].virtual_address,PAGE_SIZE) !=   0x204000)  panic("INITIAL PAGE WS entry checking failed! Review size of the WS..!!");
-		if( ROUNDDOWN(myEnv->__uptr_pws[5].virtual_address,PAGE_SIZE) !=   0x205000)  panic("INITIAL PAGE WS entry checking failed! Review size of the WS..!!");
-		if( ROUNDDOWN(myEnv->__uptr_pws[6].virtual_address,PAGE_SIZE) !=   0x800000)  panic("INITIAL PAGE WS entry checking failed! Review size of the WS..!!");
-		if( ROUNDDOWN(myEnv->__uptr_pws[7].virtual_address,PAGE_SIZE) !=   0x801000)  panic("INITIAL PAGE WS entry checking failed! Review size of the WS..!!");
-		if( ROUNDDOWN(myEnv->__uptr_pws[8].virtual_address,PAGE_SIZE) !=   0x802000)  	panic("INITIAL PAGE WS entry checking failed! Review size of the WS..!!");
-		if( ROUNDDOWN(myEnv->__uptr_pws[9].virtual_address,PAGE_SIZE) !=   0x803000)  	panic("INITIAL PAGE WS entry checking failed! Review size of the WS..!!");
-		if( ROUNDDOWN(myEnv->__uptr_pws[10].virtual_address,PAGE_SIZE) !=   0xeebfd000)  panic("INITIAL PAGE WS entry checking failed! Review size of the WS..!!");
-		//if( myEnv->page_last_WS_index !=  0)  										panic("INITIAL PAGE WS last index checking failed! Review size of the WS..!!");
-	}
+	bool found ;
 
-	int freePages = sys_calculate_free_frames();
-	int usedDiskPages = sys_pf_calculate_allocated_pages();
+#if USE_KHEAP
+	{
+		found = sys_check_WS_list(expectedInitialVAs, 11, 0x800000, 1);
+		if (found != 1) panic("INITIAL PAGE WS entry checking failed! Review size of the WS!!\n*****IF CORRECT, CHECK THE ISSUE WITH THE STAFF*****");
+	}
+#else
+	panic("make sure to enable the kernel heap: USE_KHEAP=1");
+#endif
+
+	//Writing (Modified)
+	__arr__[PAGE_SIZE*10-1] = 'a' ;
 
 	//Reading (Not Modified)
 	char garbage1 = __arr__[PAGE_SIZE*11-1] ;
 	char garbage2 = __arr__[PAGE_SIZE*12-1] ;
+	char garbage4,garbage5;
 
 	//Writing (Modified)
 	int i ;
@@ -48,29 +47,30 @@ void _main(void)
 		//*__ptr__ = *__ptr2__ ;
 		/*==========================================================================*/
 		//always use pages at 0x801000 and 0x804000
-		*__ptr2__ = *__ptr__ ;
-		__ptr__++ ; __ptr2__++ ;
-
+		garbage4 = *__ptr__ ;
+		garbage5 = *__ptr2__ ;
 	}
 
 	//===================
 
-	//cprintf("Checking PAGE CLOCK algorithm... \n");
+	cprintf_colored(TEXT_cyan, "%~\nChecking Content... \n");
 	{
-		if( ROUNDDOWN(myEnv->__uptr_pws[0].virtual_address,PAGE_SIZE) !=  0xeebfd000)  panic("Page clock algo failed.. trace it by printing WS before and after page fault");
-		if( ROUNDDOWN(myEnv->__uptr_pws[1].virtual_address,PAGE_SIZE) !=  0x80a000)  panic("Page clock algo failed.. trace it by printing WS before and after page fault");
-		if( ROUNDDOWN(myEnv->__uptr_pws[2].virtual_address,PAGE_SIZE) !=  0x804000)  panic("Page clock algo failed.. trace it by printing WS before and after page fault");
-		if( ROUNDDOWN(myEnv->__uptr_pws[3].virtual_address,PAGE_SIZE) !=  0x80b000)  panic("Page clock algo failed.. trace it by printing WS before and after page fault");
-		if( ROUNDDOWN(myEnv->__uptr_pws[4].virtual_address,PAGE_SIZE) !=  0x80c000)  panic("Page clock algo failed.. trace it by printing WS before and after page fault");
-		if( ROUNDDOWN(myEnv->__uptr_pws[5].virtual_address,PAGE_SIZE) !=  0x807000)  panic("Page clock algo failed.. trace it by printing WS before and after page fault");
-		if( ROUNDDOWN(myEnv->__uptr_pws[6].virtual_address,PAGE_SIZE) !=  0x800000)  panic("Page clock algo failed.. trace it by printing WS before and after page fault");
-		if( ROUNDDOWN(myEnv->__uptr_pws[7].virtual_address,PAGE_SIZE) !=  0x801000)  panic("Page clock algo failed.. trace it by printing WS before and after page fault");
-		if( ROUNDDOWN(myEnv->__uptr_pws[8].virtual_address,PAGE_SIZE) !=  0x808000)  panic("Page clock algo failed.. trace it by printing WS before and after page fault");
-		if( ROUNDDOWN(myEnv->__uptr_pws[9].virtual_address,PAGE_SIZE) !=  0x809000)  panic("Page clock algo failed.. trace it by printing WS before and after page fault");
-		if( ROUNDDOWN(myEnv->__uptr_pws[10].virtual_address,PAGE_SIZE) !=  0x803000)  panic("Page clock algo failed.. trace it by printing WS before and after page fault");
-		//if(myEnv->page_last_WS_index != 5) panic("wrong PAGE WS pointer location");
+		if (garbage4 != *__ptr__) panic("test failed!");
+		if (garbage5 != *__ptr2__) panic("test failed!");
 	}
-
-	cprintf("Congratulations!! test PAGE replacement [CLOCK Alg.] is completed successfully.\n");
+	cprintf_colored(TEXT_cyan, "%~\nChecking PAGE CLOCK algorithm... \n");
+	{
+		found = sys_check_WS_list(expectedFinalVAs, 11, 0xeebfd000, 1);
+		if (found != 1) panic("CLOCK alg. failed.. trace it by printing WS before and after page fault");
+	}
+	cprintf_colored(TEXT_cyan, "%~\nChecking Number of Disk Access... \n");
+	{
+		uint32 expectedNumOfFaults = 18;
+		uint32 expectedNumOfWrites = 7;
+		uint32 expectedNumOfReads = 18;
+		if (myEnv->nPageIn != expectedNumOfReads || myEnv->nPageOut != expectedNumOfWrites || myEnv->pageFaultsCounter != expectedNumOfFaults)
+			panic("CLOCK alg. failed.. unexpected number of disk access");
+	}
+	cprintf_colored(TEXT_light_green, "%~\nCongratulations!! test PAGE replacement [CLOCK Alg. #1] is completed successfully.\n");
 	return;
 }

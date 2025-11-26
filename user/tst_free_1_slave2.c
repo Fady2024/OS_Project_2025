@@ -1,4 +1,5 @@
 #include <inc/lib.h>
+#include <user/tst_malloc_helpers.h>
 
 
 void _main(void)
@@ -21,65 +22,45 @@ void _main(void)
 	//	malloc(0);
 	/*=================================================*/
 #endif
-	uint32 pagealloc_start = USER_HEAP_START + DYN_ALLOC_MAX_SIZE + PAGE_SIZE; //UHS + 32MB + 4KB
+	uint32 expectedVA = ACTUAL_PAGE_ALLOC_START; //UHS + 32MB + 4KB
 
+	//malloc some spaces
+	int i, freeFrames, usedDiskPages, expectedNumOfTables ;
+	uint32 size = 0;
+	char* ptr;
+	int sums[20] = {0};
+	totalRequestedSize = 0;
 
-	int Mega = 1024*1024;
-	int kilo = 1024;
-	char minByte = 1<<7;
-	char maxByte = 0x7F;
-	short minShort = 1<<15 ;
-	short maxShort = 0x7FFF;
-	int minInt = 1<<31 ;
-	int maxInt = 0x7FFFFFFF;
+	int eval = 0;
+	bool correct ;
 
-	char *byteArr ;
-	int lastIndexOfByte;
+	correct = 1;
 
-	int freeFrames, usedDiskPages, chk;
-	int expectedNumOfFrames, actualNumOfFrames;
-	void* ptr_allocations[20] = {0};
 	//ALLOCATE ONE SPACE
 	{
 		//2 MB
 		{
-			freeFrames = sys_calculate_free_frames() ;
-			usedDiskPages = sys_pf_calculate_allocated_pages() ;
-			ptr_allocations[0] = malloc(2*Mega-kilo);
-			if ((uint32) ptr_allocations[0] != (pagealloc_start)) panic("Wrong start address for the allocated space... ");
-			if ((sys_pf_calculate_allocated_pages() - usedDiskPages) != 0) panic("Extra or less pages are allocated in PageFile");
-
-			freeFrames = sys_calculate_free_frames() ;
-			lastIndexOfByte = (2*Mega-kilo)/sizeof(char) - 1;
-			byteArr = (char *) ptr_allocations[0];
-			byteArr[0] = minByte ;
-			byteArr[lastIndexOfByte] = maxByte ;
-			expectedNumOfFrames = 2 /*+1 table already created in malloc due to marking the allocated pages*/ ;
-			actualNumOfFrames = (freeFrames - sys_calculate_free_frames()) ;
-			if (actualNumOfFrames < expectedNumOfFrames)
-				panic("Wrong fault handler: pages are not loaded successfully into memory/WS. Expected diff in frames at least = %d, actual = %d\n", expectedNumOfFrames, actualNumOfFrames);
-
-			uint32 expectedVAs[2] = { ROUNDDOWN((uint32)(&(byteArr[0])), PAGE_SIZE), ROUNDDOWN((uint32)(&(byteArr[lastIndexOfByte])), PAGE_SIZE)} ;
-			chk = sys_check_WS_list(expectedVAs, 2, 0, 2);
-			if (chk != 1) panic("malloc: page is not added to WS");
+			allocIndex = 0;
+			expectedVA += ROUNDUP(size, PAGE_SIZE);
+			size = 2*Mega - kilo;
+			totalRequestedSize += ROUNDUP(size, PAGE_SIZE);
+			expectedNumOfTables = 1;
+			correct = allocSpaceInPageAlloc(allocIndex, size, 1, expectedNumOfTables);
+			if ((uint32) ptr_allocations[allocIndex] != (expectedVA)) { correct = 0; cprintf_colored(TEXT_TESTERR_CLR,"%~%d.3 Wrong start address for the allocated space... Expected = %x, Actual = %x\n", allocIndex, expectedVA, ptr_allocations[allocIndex]); }
 		}
 
 	}
 
 	//FREE IT
 	{
-		//Free 1st 2 MB
+		//Free 2 MB
 		{
-			freeFrames = sys_calculate_free_frames() ;
-			usedDiskPages = sys_pf_calculate_allocated_pages() ;
-			free(ptr_allocations[0]);
-
-			if ((usedDiskPages - sys_pf_calculate_allocated_pages()) != 0) panic("Wrong free: Extra or less pages are removed from PageFile");
-			if ((sys_calculate_free_frames() - freeFrames) != 2 ) panic("Wrong free: WS pages in memory and/or page tables are not freed correctly");
-			uint32 notExpectedVAs[2] = { ROUNDDOWN((uint32)(&(byteArr[0])), PAGE_SIZE), ROUNDDOWN((uint32)(&(byteArr[lastIndexOfByte])), PAGE_SIZE)} ;
-			chk = sys_check_WS_list(notExpectedVAs, 2, 0, 3);
-			if (chk != 1) panic("free: page is not removed from WS");
+			correct = freeSpaceInPageAlloc(0, 1);
 		}
+	}
+	if (!correct)
+	{
+		return;
 	}
 
 	inctst(); //to ensure that it reached here
@@ -89,9 +70,10 @@ void _main(void)
 
 	//Test accessing a freed area (processes should be killed by the validation of the fault handler)
 	{
-		byteArr[0] = minByte ;
+		char* byteArr = (char *) ptr_allocations[allocIndex];
+		byteArr[0] = maxByte ;
 		inctst();
-		panic("tst_free_1_slave1 failed: The env must be killed and shouldn't return here.");
+		panic("tst_free_1_slave2 failed: The env must be killed and shouldn't return here.");
 	}
 
 	return;

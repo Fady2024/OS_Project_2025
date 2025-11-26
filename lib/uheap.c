@@ -183,8 +183,64 @@ void* smalloc(char *sharedVarName, uint32 size, uint8 isWritable)
 
 	//TODO: [PROJECT'25.IM#3] SHARED MEMORY - #2 smalloc
 	//Your code is here
+
 	//Comment the following line
-	panic("smalloc() is not implemented yet...!!");
+	//panic("smalloc() is not implemented yet...!!");
+	uint32 num_pages= (size + PAGE_SIZE-1)/PAGE_SIZE , pages_size = num_pages*PAGE_SIZE;
+    acquire_uspinlock(&uheap_lk);
+    uint32 start = 0, end = 0;
+    uint32 exact_s = 0, worst_s = 0, worst_e = 0;
+    for (uint32 i = uheapPageAllocStart; i < uheapPageAllocBreak; i += PAGE_SIZE) {
+        int idx = get_idx(i);
+        if (allocs[idx].va == NULL) {
+            end = i + PAGE_SIZE;
+            if (start == 0) start = i;
+        } else {
+            if (end - start >= pages_size) {
+                if (end - start == pages_size)
+                    exact_s = start;
+                else if ((end - start) > (worst_e - worst_s)) {
+                    worst_s = start;
+                    worst_e = end;
+        }
+    }
+            start = 0;
+            end = 0;
+        }
+    }
+    if (start != 0 && (end - start) >= pages_size) {
+        if (end - start == pages_size)
+            exact_s = start;
+        else if ((end - start) > (worst_e - worst_s)) {
+            worst_s = start;
+            worst_e = end;
+        }
+    }
+
+    uint32 page_s = 0;
+    if (exact_s != 0)
+        page_s = exact_s;
+    else if (worst_s != 0)
+        page_s = worst_s;
+    else {
+        if (uheapPageAllocBreak + pages_size > USER_HEAP_MAX) {
+            release_uspinlock(&uheap_lk);
+            return NULL;
+        }
+        page_s = uheapPageAllocBreak;
+        uheapPageAllocBreak += pages_size;
+}
+    uint32 page_e = page_s + pages_size;
+    for (uint32 i = page_s; i < page_e; i += PAGE_SIZE) {
+        uint32 idx = get_idx(i);
+        allocs[idx].va = (void*)page_s;
+        allocs[idx].size = pages_size;
+}
+    release_uspinlock(&uheap_lk);
+    int id = sys_create_shared_object(sharedVarName, size, isWritable, (void*)page_s);
+    if (id < 0)
+        return NULL;
+    return (void*)page_s;
 }
 
 //========================================
@@ -200,7 +256,65 @@ void* sget(int32 ownerEnvID, char *sharedVarName)
 	//TODO: [PROJECT'25.IM#3] SHARED MEMORY - #4 sget
 	//Your code is here
 	//Comment the following line
-	panic("sget() is not implemented yet...!!");
+	//panic("sget() is not implemented yet...!!");
+    int size = sys_size_of_shared_object(ownerEnvID, sharedVarName);
+    if (size <= 0)
+        return NULL;
+	uint32 num_pages= (size + PAGE_SIZE-1)/PAGE_SIZE , pages_size = num_pages*PAGE_SIZE;
+    acquire_uspinlock(&uheap_lk);
+    uint32 start = 0, end = 0;
+    uint32 exact_s = 0, worst_s = 0, worst_e = 0;
+    for (uint32 i = uheapPageAllocStart; i < uheapPageAllocBreak; i += PAGE_SIZE) {
+        int idx = get_idx(i);
+        if (allocs[idx].va == NULL) {
+            end = i + PAGE_SIZE;
+            if (start == 0) start = i;
+        } else {
+            if (end - start >= pages_size) {
+                if (end - start == pages_size)
+                    exact_s = start;
+                else if ((end - start) > (worst_e - worst_s)) {
+                    worst_s = start;
+                    worst_e = end;
+                }
+            }
+            start = 0;
+            end = 0;
+        }
+    }
+    if (start != 0 && (end - start) >= pages_size) {
+        if (end - start == pages_size)
+            exact_s = start;
+        else if ((end - start) > (worst_e - worst_s)) {
+            worst_s = start;
+            worst_e = end;
+        }
+    }
+    uint32 page_s = 0;
+    if (exact_s != 0)
+        page_s = exact_s;
+    else if (worst_s != 0)
+        page_s = worst_s;
+    else {
+        if (uheapPageAllocBreak + pages_size > USER_HEAP_MAX) {
+            release_uspinlock(&uheap_lk);
+            return NULL;
+        }
+        page_s = uheapPageAllocBreak;
+        uheapPageAllocBreak += pages_size;
+    }
+    uint32 page_e = page_s + pages_size;
+    for (uint32 i = page_s; i < page_e; i += PAGE_SIZE) {
+        uint32 idx = get_idx(i);
+        allocs[idx].va = (void*)page_s;
+        allocs[idx].size = pages_size;
+    }
+    release_uspinlock(&uheap_lk);
+    int id = sys_get_shared_object(ownerEnvID, sharedVarName, (void*)page_s);
+    if (id < 0)
+        return NULL;
+    return (void*)page_s;
+
 }
 
 

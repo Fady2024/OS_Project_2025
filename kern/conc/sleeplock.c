@@ -29,7 +29,9 @@ void acquire_sleeplock(struct sleeplock *lk)
 	//TODO: [PROJECT'25.IM#5] KERNEL PROTECTION: #4 SLEEP LOCK - acquire_sleeplock
 	//Your code is here
 	//Comment the following line
-	panic("acquire_sleeplock() is not implemented yet...!!");
+	//	panic("acquire_sleeplock() is not implemented yet...!!");
+
+
 }
 
 void release_sleeplock(struct sleeplock *lk)
@@ -37,7 +39,7 @@ void release_sleeplock(struct sleeplock *lk)
 	//TODO: [PROJECT'25.IM#5] KERNEL PROTECTION: #5 SLEEP LOCK - release_sleeplock
 	//Your code is here
 	//Comment the following line
-	panic("release_sleeplock() is not implemented yet...!!");
+	//	panic("release_sleeplock() is not implemented yet...!!");
 }
 
 int holding_sleeplock(struct sleeplock *lk)
