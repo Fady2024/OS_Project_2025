@@ -32,6 +32,7 @@ void sleep(struct Channel *chan, struct kspinlock* lk)
 	//Your code is here
 	//Comment the following line
 	//	panic("sleep() is not implemented yet...!!");
+
 	struct Env* proc = get_cpu_proc();
 
 	acquire_kspinlock(&ProcessQueues.qlock);
@@ -46,10 +47,8 @@ void sleep(struct Channel *chan, struct kspinlock* lk)
 
 	release_kspinlock(lk);
 	sched();
-	acquire_kspinlock(lk);
-
     release_kspinlock(&ProcessQueues.qlock);
-
+    acquire_kspinlock(lk);
 }
 
 //==================================================

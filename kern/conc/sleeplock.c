@@ -31,7 +31,21 @@ void acquire_sleeplock(struct sleeplock *lk)
 	//Comment the following line
 	//	panic("acquire_sleeplock() is not implemented yet...!!");
 
+	if (holding_sleeplock(lk)) {
+		panic("acquire_sleeplock: lock \"%s\" is already held by the same CPU.", lk->name);
+	}
 
+    acquire_kspinlock(&lk->lk);
+
+	while (lk->locked) {
+		sleep(&lk->chan, &lk->lk);
+	}
+
+	struct Env* proc = get_cpu_proc();
+	lk->locked = 1;
+	lk->pid = proc->env_id;
+
+	release_kspinlock(&lk->lk);
 }
 
 void release_sleeplock(struct sleeplock *lk)
@@ -40,6 +54,19 @@ void release_sleeplock(struct sleeplock *lk)
 	//Your code is here
 	//Comment the following line
 	//	panic("release_sleeplock() is not implemented yet...!!");
+
+	if(!holding_sleeplock(lk)) {
+		panic("release: lock \"%s\" is either not held or held by another CPU!", lk->name);
+	}
+
+    acquire_kspinlock(&lk->lk);
+
+	lk->locked = 0;
+	lk->pid = 0;
+
+	wakeup_all(&lk->chan);
+
+	release_kspinlock(&lk->lk);
 }
 
 int holding_sleeplock(struct sleeplock *lk)
