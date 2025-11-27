@@ -337,7 +337,7 @@ struct Env* fos_scheduler_PRIRR()
 
 	struct Env *next_proc_running = NULL;
 	struct Env *curr_proc_running = get_cpu_proc();
-	
+
 	if (curr_proc_running != NULL && curr_proc_running->env_status == ENV_READY)
 	{
 		sched_insert_ready(curr_proc_running);
@@ -372,37 +372,30 @@ void clock_interrupt_handler(struct Trapframe* tf)
 
 		acquire_kspinlock(&ProcessQueues.qlock);
 		{
-			for (int QPr = 0; QPr < num_of_ready_queues; ++QPr)
+			for (int QPr = 1; QPr < num_of_ready_queues; ++QPr)
 			{
 				struct Env_Queue *q = &ProcessQueues.env_ready_queues[QPr];
 				if (LIST_EMPTY(q) == 1) continue;
-
+					
 				struct Env *e = NULL;
-				LIST_FOREACH(e, q)
+				LIST_FOREACH_SAFE(e, q, Env)
 				{
 					e->prirrs_wait_ticks++;
-				}
 
-
-				if (QPr > 0)
-				{
-					struct Env *cur = NULL;
-					LIST_FOREACH_SAFE(cur, q, Env)
+					if (e->prirrs_wait_ticks >= PRIRRS_starvThresh)
 					{
-						if (cur->prirrs_wait_ticks >= PRIRRS_starvThresh)
-						{
-							LIST_REMOVE(q, cur);
-							cur->priority = QPr - 1;
-							cur->prirrs_wait_ticks = 0;
-							LIST_INSERT_HEAD(&ProcessQueues.env_ready_queues[QPr - 1], cur);
-						}
+						LIST_REMOVE(q, e);
+
+						e->priority = QPr - 1;
+						e->prirrs_wait_ticks = 0;
+
+						LIST_INSERT_HEAD(&ProcessQueues.env_ready_queues[QPr - 1], e);
 					}
 				}
 			}
-			
 		}
 		release_kspinlock(&ProcessQueues.qlock);
-	}
+		}
 
 	/********DON'T CHANGE THESE LINES***********/
 	ticks++ ;

@@ -178,7 +178,7 @@ void sched_remove_ready(struct Env* env)
 			if (ptr_env != NULL)
 			{
 				LIST_REMOVE(&(ProcessQueues.env_ready_queues[i]), env);
-				env->env_status = ENV_UNKNOWN;
+		env->env_status = ENV_UNKNOWN;
 				return ;
 			}
 		}
