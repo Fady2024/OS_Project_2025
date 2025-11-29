@@ -348,6 +348,16 @@ void sys_set_uheap_strategy(uint32 heapStrategy)
 
 
 /*******************************/
+/* CPU SCHEDULING SYSTEM CALLS */
+/*******************************/
+// Create By Fady Gerges - 2025
+void sys_env_set_priority(int32 envID, int priority)
+{
+    env_set_priority(envID, priority);
+    return;
+}
+
+/*******************************/
 /* SHARED MEMORY SYSTEM CALLS */
 /*******************************/
 int sys_create_shared_object(char* shareName, uint32 size, uint8 isWritable, void* virtual_address)
@@ -543,7 +553,7 @@ uint32 syscall(uint32 syscallno, uint32 a1, uint32 a2, uint32 a3, uint32 a4, uin
 	//Your code is here
 	
 	case SYS_env_set_priority:
-		env_set_priority((int)a1, (int)a2);
+		sys_env_set_priority((int32)a1, (int)a2);
 		return 0;
 		break;
 
