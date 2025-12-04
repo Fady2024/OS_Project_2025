@@ -159,12 +159,11 @@ void allocate_user_mem(struct Env* e, uint32 virtual_address, uint32 size)
 	//Comment the following line
 	//panic("allocate_user_mem() is not implemented yet...!!");
 	uint32 *page_dir = (uint32*)NULL;
-	for(int i = virtual_address;i<virtual_address + size ; i+=PAGE_SIZE){
-			uint32 ptr_table = (uint32)NULL;
-			if(get_page_table(e->env_page_directory,i,&page_dir) == TABLE_NOT_EXIST){
+	for(uint32 i = virtual_address;i<virtual_address + size ; i+=PAGE_SIZE){
+		if(get_page_table(e->env_page_directory,i,&page_dir) == TABLE_NOT_EXIST){
 				create_page_table(e->env_page_directory, i);
 			}
-			pt_set_page_permissions(e->env_page_directory,i,PERM_USER | PERM_WRITEABLE | PERM_UHPAGE,0);
+		pt_set_page_permissions(e->env_page_directory,i,PERM_USER | PERM_WRITEABLE | PERM_UHPAGE,0);
 	}
 #else
 	panic("allocate_user_mem() requires USE_KHEAP=1");
@@ -187,7 +186,7 @@ void free_user_mem(struct Env* e, uint32 virtual_address, uint32 size)
 	//Your code is here
 	//Comment the following line
 	//panic("free_user_mem() is not implemented yet...!!");
-	uint32 size_before = LIST_SIZE(&(e->page_WS_list));
+
 	for(int i = virtual_address;i<virtual_address+size ; i+=PAGE_SIZE){
 		pf_remove_env_page(e,i);
 		env_page_ws_invalidate(e,i);
@@ -220,3 +219,4 @@ void move_user_mem(struct Env* e, uint32 src_virtual_address, uint32 dst_virtual
 //=================================================================================//
 //========================== END USER CHUNKS MANIPULATION =========================//
 //=================================================================================//
+
