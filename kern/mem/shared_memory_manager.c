@@ -116,6 +116,7 @@ inline struct FrameInfo** create_frames_storage(int numOfFrames) {
 //Return: allocatedObject (pointer to struct Share) passed by reference
 struct Share* alloc_share(int32 ownerID, char* shareName, uint32 size, uint8 isWritable)
 {
+#if USE_KHEAP
 	//TODO: [PROJECT'25.IM#3] SHARED MEMORY - #1 alloc_share
 	//Your code is here
 	struct Share* shared_obj=(struct Share*) kmalloc(sizeof(struct Share));
@@ -145,6 +146,10 @@ struct Share* alloc_share(int32 ownerID, char* shareName, uint32 size, uint8 isW
 	return shared_obj;
 	//Comment the following line
 	//panic("alloc_share() is not implemented yet...!!");
+#else
+	panic("Error in alloc_share: USE_KHEAP = 0 is not supported...!! ");
+	return NULL;
+#endif
 }
 
 
@@ -153,6 +158,7 @@ struct Share* alloc_share(int32 ownerID, char* shareName, uint32 size, uint8 isW
 //=========================
 int create_shared_object(int32 ownerID, char* shareName, uint32 size, uint8 isWritable, void* virtual_address)
 {
+#if USE_KHEAP
 	//TODO: [PROJECT'25.IM#3] SHARED MEMORY - #3 create_shared_object
 	//Comment the following line
 	//panic("create_shared_object() is not implemented yet...!!");
@@ -220,6 +226,10 @@ int create_shared_object(int32 ownerID, char* shareName, uint32 size, uint8 isWr
 	//	a) ID of the shared object (its VA after masking out its msb) if success
 	//	b) E_SHARED_MEM_EXISTS if the shared object already exists
 	//	c) E_NO_SHARE if failed to create a shared object
+#else
+	panic("Error in create_shared_object: USE_KHEAP = 0 is not supported...!! ");
+	return E_NO_SHARE;
+#endif
 }
 
 
@@ -228,6 +238,7 @@ int create_shared_object(int32 ownerID, char* shareName, uint32 size, uint8 isWr
 //======================
 int get_shared_object(int32 ownerID, char* shareName, void* virtual_address)
 {
+#if USE_KHEAP
 	//TODO: [PROJECT'25.IM#3] SHARED MEMORY - #5 get_shared_object
 	//Your code is here
 	//Comment the following line
@@ -289,7 +300,10 @@ int get_shared_object(int32 ownerID, char* shareName, void* virtual_address)
 	// RETURN:
 	//	a) ID of the shared object (its VA after masking out its msb) if success
 	//	b) E_SHARED_MEM_NOT_EXISTS if the shared object is not exists
-
+#else
+	panic("get_shared_object: USE_KHEAP is off, implementation needed");
+	return E_SHARED_MEM_NOT_EXISTS;
+#endif
 }
 
 //==================================================================================//
@@ -302,6 +316,7 @@ int get_shared_object(int32 ownerID, char* shareName, void* virtual_address)
 //it should free its framesStorage and the share object itself
 void free_share(struct Share* ptrShare)
 {
+#if USE_KHEAP
 	//TODO: [PROJECT'25.BONUS#5] EXIT #2 - free_share
 	//Your code is here
 	//Comment the following line
@@ -309,6 +324,9 @@ void free_share(struct Share* ptrShare)
     LIST_REMOVE(&(AllShares.shares_list),ptrShare);
     kfree(ptrShare->framesStorage);
     kfree(ptrShare);
+#else
+	panic("Error in free_share: USE_KHEAP = 0 is not supported...!! ");
+#endif
 }
 
 

@@ -320,12 +320,16 @@ void page_fault_handler(struct Env * faulted_env, uint32 fault_va)
 		cprintf("4- PAGE FAULT HANDLER: Fault at address 0x%x, wsSize = %d\n", fault_va, wsSize);
 
 
+#if USE_KHEAP
 		struct WorkingSetElement* new_ele = env_page_ws_list_create_element(faulted_env, fault_va);
 		LIST_INSERT_TAIL(&(faulted_env->page_WS_list), new_ele);
 		if(faulted_env->page_WS_list.size == faulted_env->page_WS_max_size){
 			faulted_env->page_last_WS_element =(struct WorkingSetElement*) LIST_FIRST(&(faulted_env->page_WS_list));
 		}
 		else faulted_env->page_last_WS_element = NULL;
+#else
+		panic("Error in page_fault_handler: USE_KHEAP = 0 is not supported...!!");
+#endif
 
 		cprintf("5- PAGE FAULT HANDLER: Fault at address 0x%x, wsSize = %d\n", fault_va, wsSize);
 

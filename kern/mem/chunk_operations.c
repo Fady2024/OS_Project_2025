@@ -147,6 +147,7 @@ void* sys_sbrk(int numOfPages)
 //=====================================
 void allocate_user_mem(struct Env* e, uint32 virtual_address, uint32 size)
 {
+#if USE_KHEAP
 	/*====================================*/
 	/*Remove this line before start coding*/
 //		inctst();
@@ -165,6 +166,9 @@ void allocate_user_mem(struct Env* e, uint32 virtual_address, uint32 size)
 			}
 			pt_set_page_permissions(e->env_page_directory,i,PERM_USER | PERM_WRITEABLE | PERM_UHPAGE,0);
 	}
+#else
+	panic("allocate_user_mem() requires USE_KHEAP=1");
+#endif
 }
 
 //=====================================
@@ -172,6 +176,7 @@ void allocate_user_mem(struct Env* e, uint32 virtual_address, uint32 size)
 //=====================================
 void free_user_mem(struct Env* e, uint32 virtual_address, uint32 size)
 {
+#if USE_KHEAP
 	/*====================================*/
 	/*Remove this line before start coding*/
 //		inctst();
@@ -189,6 +194,9 @@ void free_user_mem(struct Env* e, uint32 virtual_address, uint32 size)
 		unmap_frame(e->env_page_directory, i);
 		pt_clear_page_table_entry(e->env_page_directory,i);
 	}
+#else
+	panic("free_user_mem() requires USE_KHEAP=1");
+#endif
 
 }
 
