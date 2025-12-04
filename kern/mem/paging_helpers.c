@@ -108,14 +108,14 @@ inline uint32 virtual_to_physical(uint32* directory, uint32 virtual_address)
 	//TODO: PRACTICE: fill this function.
 	//Comment the following line
 	//panic("Function is not implemented yet!");
-	uint32 pte = vpt[VPN(virtual_address)];
-		if ((pte & PERM_PRESENT) == 0)
+	uint32 pte__ = vpt[VPN(virtual_address)];
+		if ((pte__ & PERM_PRESENT) == 0)
 			return 0;
 
-		uint32 frame_pa  = EXTRACT_ADDRESS(pte);
+		uint32 frame_pa  = EXTRACT_ADDRESS(pte__);
 		uint32 offset = virtual_address & (PAGE_SIZE - 1);
-		uint32 PA=frame_pa + offset;
-		return PA;
+		uint32 PhyAd=frame_pa + offset;
+		return PhyAd;
 }
 
 //===============================
@@ -138,9 +138,9 @@ inline uint32 physical_to_virtual(uint32* directory, uint32 physical_address)
         uint32 fn = PPN(physical_address);
         if (fn < number_of_frames)
         {
-            uint32 base = PhysAddrToVirtAddr_kheap[fn];
-            if (base != 0)
-                return base + PGOFF(physical_address);
+            uint32 base__ = PhysAddrToVirtAddr_kheap[fn];
+            if (base__ != 0)
+                return base__ + PGOFF(physical_address);
         }
     }
 

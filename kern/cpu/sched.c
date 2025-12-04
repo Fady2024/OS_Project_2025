@@ -226,8 +226,7 @@ void sched_init_PRIRR(uint8 numOfPriorities, uint8 quantum, uint32 starvThresh)
 		//Your code is here
 		//Comment the following line
 		//panic("sched_init_PRIRR() is not implemented yet...!!");
-		if(numOfPriorities <=0 ||quantum <=0 || starvThresh <=0)
-			panic("Error In sched_init_PRIRR: invalid input parameters");
+		if(numOfPriorities <=0 ||quantum <=0 || starvThresh <=0) panic("Error In sched_init_PRIRR: invalid input parameters");
 
 		num_of_ready_queues = numOfPriorities;
 
@@ -240,6 +239,12 @@ void sched_init_PRIRR(uint8 numOfPriorities, uint8 quantum, uint32 starvThresh)
 		if (ProcessQueues.env_ready_queues == NULL)panic("Error In sched_init_PRIRR: null ready queues pointer");
 		if (quantums == NULL)panic("Error In sched_init_PRIRR: null quantums pointer");
 
+		for (int s = 0; s < num_of_ready_queues; ++s)
+		{
+			init_queue(&(ProcessQueues.env_ready_queues[s]));
+			quantums[s] = quantum;
+		}
+#else
 		for (int s = 0; s < num_of_ready_queues; ++s)
 		{
 			init_queue(&(ProcessQueues.env_ready_queues[s]));
@@ -335,25 +340,25 @@ struct Env* fos_scheduler_PRIRR()
 	//Comment the following line
 	//panic("fos_scheduler_PRIRR() is not implemented yet...!!");
 
-	struct Env *next_proc_running = NULL;
-	struct Env *curr_proc_running = get_cpu_proc();
+	struct Env *next_proc__ = NULL;
+	struct Env *curr_proc__ = get_cpu_proc();
 
-	if (curr_proc_running != NULL && curr_proc_running->env_status == ENV_READY)
+	if (curr_proc__ != NULL && curr_proc__->env_status == ENV_READY)
 	{
-		sched_insert_ready(curr_proc_running);
+		sched_insert_ready(curr_proc__);
 	}
 
 	for (int p = 0; p < num_of_ready_queues; ++p)
 	{
-		next_proc_running = dequeue(&(ProcessQueues.env_ready_queues[p]));
-		if (next_proc_running != NULL)
+		next_proc__ = dequeue(&(ProcessQueues.env_ready_queues[p]));
+		if (next_proc__ != NULL)
 		{
 			kclock_set_quantum(quantums[p]);
 			break;
 		}
 	}
 
-	return next_proc_running;
+	return next_proc__;
 }
 
 //========================================
@@ -372,9 +377,9 @@ void clock_interrupt_handler(struct Trapframe* tf)
 
 		acquire_kspinlock(&ProcessQueues.qlock);
 		{
-			for (int QPr = 1; QPr < num_of_ready_queues; ++QPr)
+			for (int QPr__ = 1; QPr__ < num_of_ready_queues; ++QPr__)
 			{
-				struct Env_Queue *q = &ProcessQueues.env_ready_queues[QPr];
+				struct Env_Queue *q = &ProcessQueues.env_ready_queues[QPr__];
 				if (LIST_EMPTY(q) == 1) continue;
 					
 				struct Env *e = NULL;
@@ -386,10 +391,10 @@ void clock_interrupt_handler(struct Trapframe* tf)
 					{
 						LIST_REMOVE(q, e);
 
-						e->priority = QPr - 1;
+						e->priority = QPr__ - 1;
 						e->prirrs_wait_ticks = 0;
 
-						LIST_INSERT_HEAD(&ProcessQueues.env_ready_queues[QPr - 1], e);
+						LIST_INSERT_HEAD(&ProcessQueues.env_ready_queues[QPr__ - 1], e);
 					}
 				}
 			}

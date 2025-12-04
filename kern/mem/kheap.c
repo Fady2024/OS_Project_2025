@@ -69,9 +69,9 @@ int get_page(void* va)
 //==============================================
 void return_page(void* va)
 {
-	uint32 pa = virtual_to_physical(ptr_page_directory,ROUNDDOWN((uint32)va, PAGE_SIZE));
-	if (pa != 0 && PhysAddrToVirtAddr_kheap != NULL)
-		PhysAddrToVirtAddr_kheap[PPN(pa)] = 0;
+	uint32 physAdd = virtual_to_physical(ptr_page_directory,ROUNDDOWN((uint32)va, PAGE_SIZE));
+	if (physAdd != 0 && PhysAddrToVirtAddr_kheap != NULL)
+		PhysAddrToVirtAddr_kheap[PPN(physAdd)] = 0;
 	unmap_frame(ptr_page_directory, ROUNDDOWN((uint32)va, PAGE_SIZE));
 }
 
@@ -207,8 +207,8 @@ unsigned int kheap_virtual_address(unsigned int physical_address)
 	//Comment the following line
 	//panic("kheap_virtual_address() is not implemented yet...!!");
     numOfKheapVACalls++;
-    uint32 va = physical_to_virtual(ptr_page_directory, physical_address);
-    return (va == 0xFFFFFFFF) ? 0 : va;
+    uint32 viradd = physical_to_virtual(ptr_page_directory, physical_address);
+    return (viradd == 0xFFFFFFFF) ? 0 : viradd;
 		/*EFFICIENT IMPLEMENTATION ~O(1) IS REQUIRED */
 }
 

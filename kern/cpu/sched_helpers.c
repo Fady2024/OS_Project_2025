@@ -695,28 +695,24 @@ void env_set_priority(int envID, int priority)
 	//Your code is here
 	//Comment the following line
 	//panic("env_set_priority() is not implemented yet...!!");
-	if (priority < 0 || priority >= num_of_ready_queues){
-		cprintf("Invalid priority number: %d\n", priority);
-		return;
-	}
 
-	struct Env *env = NULL;
-	int r = envid2env(envID, &env, 0);
-	if (r < 0 || env == NULL){
+	struct Env *env__ = NULL;
+	int r = envid2env(envID, &env__, 0);
+	if (r < 0 || env__ == NULL){
         cprintf("Environment %d not found.\n", envID);
 		return;
 	}
 		acquire_kspinlock(&ProcessQueues.qlock);
-		if (env->env_status == ENV_READY)
+		if (env__->env_status == ENV_READY)
 		{
 			// Remove from current ready queue
-			sched_remove_ready(env);
+			sched_remove_ready(env__);
 			// Update priority and re-insert into the appropriate ready queue
-			env->priority = priority;
-			sched_insert_ready(env);
+			env__->priority = priority;
+			sched_insert_ready(env__);
 		}
 		else{
-			env->priority = priority;
+			env__->priority = priority;
 		}
 	release_kspinlock(&ProcessQueues.qlock);
 }
@@ -726,11 +722,7 @@ void sched_set_starv_thresh(uint32 starvThresh)
 	//Your code is here
 	//Comment the following line
 	//panic("sched_set_starv_thresh() is not implemented yet...!!");
-	if(starvThresh <= 0)
-	{
-		cprintf("Invalid starvation threshold number: %u\n", starvThresh);
-		return;
-	}
+	
 	PRIRRS_starvThresh = starvThresh;
 	cprintf("New Starvation threshold successfully set to %u\n", PRIRRS_starvThresh);
 
