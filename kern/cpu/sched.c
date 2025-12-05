@@ -29,6 +29,37 @@ static struct Env* (*sched_next[])(void) = {
 };
 
 //===================================
+// [0] Helper Functions:
+//===================================
+inline static uint32 age(uint32 old_age,bool accessed){
+    uint32 n_age =old_age>>1;
+    if(accessed) n_age |=0x80000000u;
+
+    return n_age;
+
+}
+
+inline static bool return_and_clear_ub(struct Env*env,uint32 va){
+    uint32 prm = pt_get_page_permissions(env->env_page_directory, va);
+    if(prm & PERM_USED){
+        pt_set_page_permissions(env->env_page_directory,va,0,PERM_USED);
+        return 1;
+    }
+    else
+        return 0;
+
+}
+inline static bool return_and_clear_pde(struct Env*env,uint32 va){
+    if(pd_is_table_used(env->env_page_directory,va)){
+        pd_set_table_unused(env->env_page_directory,va);
+        return 1;
+
+    }
+    else
+        return 0;
+}
+
+//===================================
 // [1] Default Scheduler Initializer:
 //===================================
 void sched_init()
@@ -381,7 +412,7 @@ void clock_interrupt_handler(struct Trapframe* tf)
 			{
 				struct Env_Queue *q = &ProcessQueues.env_ready_queues[QPr__];
 				if (LIST_EMPTY(q) == 1) continue;
-					
+
 				struct Env *e = NULL;
 				LIST_FOREACH_SAFE(e, q, Env)
 				{
@@ -433,9 +464,48 @@ void clock_interrupt_handler(struct Trapframe* tf)
 //===================================================================
 void update_WS_time_stamps()
 {
-	//TODO: [PROJECT'25.IM#6] FAULT HANDLER II - #1 update_WS_time_stamps
-	//Your code is here
-	//Comment the following line
-	panic("update_WS_time_stamps is not implemented yet...!!");
+    //TODO: [PROJECT'25.IM#6] FAULT HANDLER II - #1 update_WS_time_stamps
+    //Your code is here
+    //Comment the following line
+    //panic("update_WS_time_stamps is not implemented yet...!!");
 
+    struct Env *cur_env = get_cpu_proc();
+
+    if(!cur_env )return ;
+
+#if !USE_KHEAP
+
+    for(int i=0;i<cur_env->page_WS_max_size;i++)
+    {
+        struct WorkingSetElement *we= &cur_env->ptr_pageWorkingSet[i];
+        if(we->empty)
+            continue;
+         uint32 va=ROUNDDOWN(we->virtual_address,PAGE_SIZE);
+         bool accessed = return_and_clear_ub(cur_env,va);
+         uint32 n_age= age(we->time_stamp,accessed);
+         we->time_stamp=n_age;
+    }
+#else
+            struct WorkingSetElement *we;
+
+                        LIST_FOREACH(we,&(cur_env->page_WS_list)){
+                            if(we->empty) continue;
+                     uint32 va=ROUNDDOWN(we->virtual_address,PAGE_SIZE);
+                       bool accessed = return_and_clear_ub(cur_env,va);
+                       uint32 n_age= age(we->time_stamp,accessed);
+                           we->time_stamp=n_age;
+                        }
+#endif
+
+
+        for(int i =0;i<__TWS_MAX_SIZE;i++){
+
+        if(cur_env->__ptr_tws[i].empty) continue;
+
+            uint32 tva= ROUNDDOWN(cur_env->__ptr_tws[i].virtual_address,PAGE_SIZE);
+            bool accessed = return_and_clear_pde(cur_env,tva);
+            uint32 n_age= age(cur_env->__ptr_tws[i].time_stamp,accessed);
+            cur_env->__ptr_tws[i].time_stamp=n_age;
+
+        }
 }

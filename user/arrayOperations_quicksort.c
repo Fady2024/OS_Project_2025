@@ -1,8 +1,5 @@
 #include <inc/lib.h>
-
-//Functions Declarations
-void Swap(int *Elements, int First, int Second);
-void PrintElements(int *Elements, int NumOfElements);
+#include <user/arrayOperations.h>
 
 void QuickSort(int *Elements, int NumOfElements);
 void QSort(int *Elements,int NumOfElements, int startIndex, int finalIndex);
@@ -14,16 +11,27 @@ void _main(void)
 
 	int ret;
 	/*[1] GET SEMAPHORES*/
+#if USE_KERN_SEMAPHORE
+#else
 	struct semaphore ready = get_semaphore(parentenvID, "Ready");
 	struct semaphore finished = get_semaphore(parentenvID, "Finished");
+#endif
 
 	/*[2] WAIT A READY SIGNAL FROM THE MASTER*/
+#if USE_KERN_SEMAPHORE
+	char waitCmd1[64] = "__KSem@0@Wait";
+	sys_utilities(waitCmd1, 0);
+#else
 	wait_semaphore(ready);
+#endif
 
 	/*[3] GET SHARED VARs*/
 	//Get the cons_mutex ownerID
 	int* consMutexOwnerID = sget(parentenvID, "cons_mutex ownerID") ;
+#if USE_KERN_SEMAPHORE
+#else
 	struct semaphore cons_mutex = get_semaphore(*consMutexOwnerID, "Console Mutex");
+#endif
 
 	//Get the shared array & its size
 	int *numOfElements = NULL;
@@ -42,16 +50,31 @@ void _main(void)
 	}
 	QuickSort(sortedArray, *numOfElements);
 
+#if USE_KERN_SEMAPHORE
+	char waitCmd2[64] = "__KSem@2@Wait";
+	sys_utilities(waitCmd2, 0);
+#else
 	wait_semaphore(cons_mutex);
+#endif
 	{
 		cprintf("Quick sort is Finished!!!!\n") ;
 		cprintf("will notify the master now...\n");
 		cprintf("Quick sort says GOOD BYE :)\n") ;
 	}
+#if USE_KERN_SEMAPHORE
+	char signalCmd1[64] = "__KSem@2@Signal";
+	sys_utilities(signalCmd1, 0);
+#else
 	signal_semaphore(cons_mutex);
+#endif
 
 	/*[5] DECLARE FINISHING*/
+#if USE_KERN_SEMAPHORE
+	char signalCmd2[64] = "__KSem@1@Signal";
+	sys_utilities(signalCmd2, 0);
+#else
 	signal_semaphore(finished);
+#endif
 }
 
 ///Quick sort
@@ -86,30 +109,5 @@ void QSort(int *Elements,int NumOfElements, int startIndex, int finalIndex)
 	QSort(Elements, NumOfElements, i, finalIndex);
 
 	//cprintf("qs,after sorting: start = %d, end = %d\n", startIndex, finalIndex);
-
-}
-
-///Private Functions
-
-
-void Swap(int *Elements, int First, int Second)
-{
-	int Tmp = Elements[First] ;
-	Elements[First] = Elements[Second] ;
-	Elements[Second] = Tmp ;
-}
-
-
-void PrintElements(int *Elements, int NumOfElements)
-{
-	int i ;
-	int NumsPerLine = 20 ;
-	for (i = 0 ; i < NumOfElements-1 ; i++)
-	{
-		if (i%NumsPerLine == 0)
-			cprintf("\n");
-		cprintf("%d, ",Elements[i]);
-	}
-	cprintf("%d\n",Elements[i]);
 
 }

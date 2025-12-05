@@ -159,6 +159,8 @@ struct Env {
 	struct WorkingSetElement __ptr_tws[__TWS_MAX_SIZE];
 	uint32 table_last_WS_index;
 
+	struct WS_List ActiveListOptimal ; // For the optimal Algorithm
+
 	//2020: Data structures of LRU Approx replacement policy
 	struct WS_List ActiveList ;		//LRU Approx: ActiveList that should work as FCFS
 	struct WS_List SecondList ;		//LRU Approx: SecondList that should work as LRU
@@ -169,7 +171,7 @@ struct Env {
 	struct WorkingSetElement* __uptr_pws;
 
 	//Percentage of WS pages to be removed [either for scarce RAM or Full WS]
-		unsigned int percentage_of_WS_pages_to_be_removed;
+	unsigned int percentage_of_WS_pages_to_be_removed;
 
 	//==================
 	/*CPU BSD Sched...*/

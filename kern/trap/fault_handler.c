@@ -57,6 +57,54 @@ uint32 getModifiedBufferLength() { return _ModifiedBufferLength;}
 
 //===============================
 // FAULT HANDLERS
+inline static void placement(struct Env* faulted_env,uint32 fault_va)
+{
+	fault_va = ROUNDDOWN(fault_va, PAGE_SIZE);
+	struct FrameInfo* frame = NULL;
+	allocate_frame(&frame);
+	frame->proc = faulted_env;
+
+	uint32 perms =  PERM_WRITEABLE | PERM_USER | PERM_USED;
+	if (fault_va >= USER_HEAP_START && fault_va < USER_HEAP_MAX)
+		perms |= PERM_UHPAGE;
+
+	map_frame(faulted_env->env_page_directory, frame, fault_va, perms);
+
+	uint32 read_page = pf_read_env_page(faulted_env, (void*)fault_va);
+	if (read_page == E_PAGE_NOT_EXIST_IN_PF)
+	{
+		if (fault_va < USTACKTOP && fault_va >= USTACKBOTTOM)
+		{
+			memset((void*)ROUNDDOWN(fault_va, PAGE_SIZE), 0, PAGE_SIZE);
+		}
+		else if (fault_va >= USER_HEAP_START && fault_va < USER_HEAP_MAX)
+		{
+			memset((void*)ROUNDDOWN(fault_va, PAGE_SIZE), 0, PAGE_SIZE);
+		}
+		else
+		{
+			unmap_frame(faulted_env->env_page_directory, fault_va);
+			env_exit();
+		}
+	}
+}
+
+inline static void replacment(struct Env* f_env,uint32 f_va,uint32 v_va){
+    uint32 *ptr_page_table = NULL;
+
+	uint32 vperm = pt_get_page_permissions(f_env->env_page_directory, v_va);
+	if (vperm & PERM_MODIFIED)
+	{
+		struct FrameInfo* vfi = get_frame_info(f_env->env_page_directory, v_va, &ptr_page_table);
+		if (vfi) pf_update_env_page(f_env, v_va, vfi);
+	}
+
+	unmap_frame(f_env->env_page_directory, v_va);
+
+	placement(f_env, f_va);
+
+}
+
 //===============================
 
 //==================
@@ -266,111 +314,435 @@ int get_optimal_num_faults(struct WS_List *initWorkingSet, int maxWSSize, struct
 	//TODO: [PROJECT'25.IM#1] FAULT HANDLER II - #2 get_optimal_num_faults
 	//Your code is here
 	//Comment the following line
-	panic("get_optimal_num_faults() is not implemented yet...!!");
+	//panic("get_optimal_num_faults() is not implemented yet...!!");
+
+    struct WS_List ActiveListOptimal;
+    LIST_INIT(&ActiveListOptimal);
+
+    struct WorkingSetElement *itwse;
+    LIST_FOREACH(itwse, initWorkingSet)
+    {
+        struct WorkingSetElement *copywse = kmalloc(sizeof(struct WorkingSetElement));
+        copywse->virtual_address = ROUNDDOWN(itwse->virtual_address, PAGE_SIZE);
+        LIST_INSERT_TAIL(&ActiveListOptimal, copywse);
+    }
+
+    int optimal_num_faults = 0;
+    int found;
+    struct PageRefElement* itpr;
+    LIST_FOREACH(itpr, pageReferences)
+    {
+        found = 0;
+        LIST_FOREACH(itwse, &ActiveListOptimal)
+        {
+            if (ROUNDDOWN(itwse->virtual_address, PAGE_SIZE) == itpr->virtual_address)
+            {
+                found = 1;
+                break;
+            }
+        }
+
+        if (!found)
+        {
+            optimal_num_faults++;
+            uint32 ws_size = LIST_SIZE(&ActiveListOptimal);
+
+            if (ws_size < maxWSSize)
+            {
+                // Working set not full, just add
+                struct WorkingSetElement *copywse = kmalloc(sizeof(struct WorkingSetElement));
+                copywse->virtual_address = ROUNDDOWN(itpr->virtual_address, PAGE_SIZE);
+                LIST_INSERT_TAIL(&ActiveListOptimal, copywse);
+            }
+            else
+            {
+                // Working set is FULL - find optimal victim
+
+                struct WorkingSetElement *victim;
+                int maxDistance = -1;
+                int foundInRef = 0;
+                int distance = 0;
+
+                struct WorkingSetElement *itwse_victim;
+                LIST_FOREACH(itwse_victim, &ActiveListOptimal)
+                {
+                    struct PageRefElement *futureRef = LIST_NEXT(itpr);
+                    while (futureRef != NULL)
+                    {
+                        distance++;
+                        if (ROUNDDOWN(futureRef->virtual_address, PAGE_SIZE) == itwse_victim->virtual_address)
+                        {
+                            foundInRef = 1;
+                            break;
+                        }
+                        futureRef = LIST_NEXT(futureRef);
+                    }
+
+                    if (!foundInRef)
+                    {
+                        victim = itwse_victim;
+                        break;
+                    }
+                    else if (maxDistance < distance)
+                    {
+                        maxDistance = distance;
+                        victim = itwse_victim;
+                    }
+
+                    foundInRef = 0;
+                	distance = 0;
+                }
+                victim->virtual_address = ROUNDDOWN(itpr->virtual_address, PAGE_SIZE);
+            }
+        }
+    }
+
+    // Clean up
+    LIST_FOREACH_SAFE(itwse, &ActiveListOptimal, WorkingSetElement)
+    {
+        LIST_REMOVE(&ActiveListOptimal, itwse);
+        kfree(itwse);  // Don't forget to free!
+    }
+
+    return optimal_num_faults;
 }
 
 void page_fault_handler(struct Env * faulted_env, uint32 fault_va)
 {
 #if USE_KHEAP
-	struct WorkingSetElement *victimWSElement = NULL;
-	uint32 wsSize = LIST_SIZE(&(faulted_env->page_WS_list));
-#else
-	int iWS =faulted_env->page_last_WS_index;
-	uint32 wsSize = env_page_ws_get_size(faulted_env);
-#endif
-	if(wsSize < (faulted_env->page_WS_max_size))
-	{
-		//TODO: [PROJECT'25.GM#3] FAULT HANDLER I - #3 placement
-		//Your code is here
-		//Comment the following line
-		//panic("page_fault_handler().PLACEMENT is not implemented yet...!!");
-
-		struct FrameInfo* frame = NULL;
-		allocate_frame(&frame);
-		frame->proc = faulted_env;
-
-		int perms =  PERM_WRITEABLE | PERM_USER;
-		if (fault_va >= USER_HEAP_START && fault_va < USER_HEAP_MAX)
-		    perms |= PERM_UHPAGE;
-
-		map_frame(faulted_env->env_page_directory, frame, fault_va, perms);
-
-		uint32 read_page = pf_read_env_page(faulted_env, (void*)fault_va);
-		if (read_page == E_PAGE_NOT_EXIST_IN_PF)
-		{
-			cprintf("0- PAGE FAULT HANDLER: Fault at address 0x%x, wsSize = %d\n", fault_va, wsSize);
-			if (fault_va < USTACKTOP && fault_va >= USTACKBOTTOM)
-			{
-				cprintf("1- PAGE FAULT HANDLER: Fault at address 0x%x, wsSize = %d\n", fault_va, wsSize);
-				memset((void*)ROUNDDOWN(fault_va, PAGE_SIZE), 0, PAGE_SIZE);
-				cprintf("1.5- PAGE FAULT HANDLER: Fault at address 0x%x, wsSize = %d\n", fault_va, wsSize);
-			}
-			else if (fault_va >= USER_HEAP_START && fault_va < USER_HEAP_MAX)
-			{
-				cprintf("2- PAGE FAULT HANDLER: Fault at address 0x%x, wsSize = %d\n", fault_va, wsSize);
-				memset((void*)ROUNDDOWN(fault_va, PAGE_SIZE), 0, PAGE_SIZE);
-			}
-			else
-			{
-				cprintf("3- PAGE FAULT HANDLER: Fault at address 0x%x, wsSize = %d\n", fault_va, wsSize);
-				unmap_frame(faulted_env->env_page_directory, fault_va);
-				env_exit();
-			}
-		}
-		cprintf("4- PAGE FAULT HANDLER: Fault at address 0x%x, wsSize = %d\n", fault_va, wsSize);
-
-
-#if USE_KHEAP
-		struct WorkingSetElement* new_ele = env_page_ws_list_create_element(faulted_env, fault_va);
-		LIST_INSERT_TAIL(&(faulted_env->page_WS_list), new_ele);
-		if(faulted_env->page_WS_list.size == faulted_env->page_WS_max_size){
-			faulted_env->page_last_WS_element =(struct WorkingSetElement*) LIST_FIRST(&(faulted_env->page_WS_list));
-		}
-		else faulted_env->page_last_WS_element = NULL;
-#else
-		panic("Error in page_fault_handler: USE_KHEAP = 0 is not supported...!!");
-#endif
-
-		cprintf("5- PAGE FAULT HANDLER: Fault at address 0x%x, wsSize = %d\n", fault_va, wsSize);
-
-	}
-	else
-	{
-		if (isPageReplacmentAlgorithmOPTIMAL())
+	if (isPageReplacmentAlgorithmOPTIMAL())
 		{
 			//TODO: [PROJECT'25.IM#1] FAULT HANDLER II - #1 Optimal Reference Stream
 			//Your code is here
 			//Comment the following line
-			panic("page_fault_handler().REPLACEMENT is not implemented yet...!!");
+			//panic("page_fault_handler().REPLACEMENT is not implemented yet...!!");
+
+		    fault_va = ROUNDDOWN(fault_va, PAGE_SIZE);
+
+		    // Copy List from page_WS_list to ActiveListOptimal
+		    struct WorkingSetElement *itwse;
+			if (LIST_SIZE(&(faulted_env->ActiveListOptimal)) == 0)
+			{
+				LIST_FOREACH_SAFE(itwse, &(faulted_env->page_WS_list), WorkingSetElement)
+				{
+					struct WorkingSetElement *copywse = env_page_ws_list_create_element(faulted_env, itwse->virtual_address) ;
+					LIST_INSERT_TAIL(&(faulted_env->ActiveListOptimal), copywse);
+				}
+			}
+
+			// Check if in ActiveListOptimal
+		    struct WorkingSetElement *wse;
+		    LIST_FOREACH(wse, &(faulted_env->ActiveListOptimal))
+		    {
+		        if (ROUNDDOWN(wse->virtual_address, PAGE_SIZE) == fault_va)
+		        {
+		            return;
+		        }
+		    }
+
+		    // Add to referenceStreamList
+			struct PageRefElement *new_ref = kmalloc(sizeof(struct PageRefElement));
+			new_ref->virtual_address = fault_va;
+			LIST_INSERT_TAIL(&(faulted_env->referenceStreamList), new_ref);
+
+			// Check if in memory
+		    int foundInMem = 0;
+		    uint32 *ptr_table = NULL;
+		    struct FrameInfo *frameInMem = get_frame_info(faulted_env->env_page_directory, fault_va, &ptr_table);
+		    if (frameInMem != NULL)
+		    {
+		    	foundInMem = 1;
+		        pt_set_page_permissions(faulted_env->env_page_directory, fault_va, PERM_PRESENT, 0);
+		    }
+
+		    // If Active WS is FULL, reset present & delete all its pages
+		    uint32 ws_size = LIST_SIZE(&(faulted_env->ActiveListOptimal));
+		    if (ws_size == faulted_env->page_WS_max_size)
+		    {
+		        LIST_FOREACH_SAFE(wse, &(faulted_env->ActiveListOptimal), WorkingSetElement)
+		        {
+		            uint32 wse_va = ROUNDDOWN(wse->virtual_address, PAGE_SIZE);
+
+		            pt_set_page_permissions(faulted_env->env_page_directory, wse_va, 0, PERM_PRESENT);
+					LIST_REMOVE(&(faulted_env->ActiveListOptimal), wse);
+		        }
+		    }
+
+		    // If faulted page not in memory, read it from disk
+		    if (!foundInMem)
+		    {
+				struct FrameInfo *frame = NULL;
+				allocate_frame(&frame);
+				frame->proc = faulted_env;
+
+				uint32 perms =  PERM_WRITEABLE | PERM_USER | PERM_USED;
+				if (fault_va >= USER_HEAP_START && fault_va < USER_HEAP_MAX)
+				{
+					perms |= PERM_UHPAGE;
+				}
+
+				map_frame(faulted_env->env_page_directory, frame, fault_va, perms);
+
+				int read_page = pf_read_env_page(faulted_env, (void*)fault_va);
+
+				if (read_page == E_PAGE_NOT_EXIST_IN_PF)
+				{
+					if (fault_va < USTACKTOP && fault_va >= USTACKBOTTOM)
+					{
+						memset((void*)ROUNDDOWN(fault_va, PAGE_SIZE), 0, PAGE_SIZE);
+					}
+					else if (fault_va >= USER_HEAP_START && fault_va < USER_HEAP_MAX)
+					{
+						memset((void*)ROUNDDOWN(fault_va, PAGE_SIZE), 0, PAGE_SIZE);
+					}
+					else
+					{
+						unmap_frame(faulted_env->env_page_directory, fault_va);
+						return;
+					}
+				}
+		    }
+
+		    // Add the faulted page to the Active WS
+			struct WorkingSetElement* new_ele = env_page_ws_list_create_element(faulted_env, fault_va);
+			LIST_INSERT_TAIL(&(faulted_env->ActiveListOptimal), new_ele);
+
+		    return;
 		}
-		else if (isPageReplacmentAlgorithmOPTIMAL())
+	else
+	{
+		struct WorkingSetElement *victimWSElement = NULL;
+		uint32 wsSize = LIST_SIZE(&(faulted_env->page_WS_list));
+		if(wsSize < (faulted_env->page_WS_max_size))
 		{
-			//TODO: [PROJECT'25.IM#1] FAULT HANDLER II - #3 Clock Replacement
+			//TODO: [PROJECT'25.GM#3] FAULT HANDLER I - #3 placement
 			//Your code is here
 			//Comment the following line
-			panic("page_fault_handler().REPLACEMENT is not implemented yet...!!");
+			//panic("page_fault_handler().PLACEMENT is not implemented yet...!!");
+
+			placement(faulted_env, fault_va);
+
+			struct WorkingSetElement* new_ele = env_page_ws_list_create_element(faulted_env, fault_va);
+
+			if (faulted_env->page_last_WS_element != NULL)
+			{
+				LIST_INSERT_BEFORE(&(faulted_env->page_WS_list), faulted_env->page_last_WS_element, new_ele);
+			}
+			else
+			{
+				LIST_INSERT_TAIL(&(faulted_env->page_WS_list), new_ele);
+			}
+
+			if(faulted_env->page_WS_list.size == faulted_env->page_WS_max_size && faulted_env->page_last_WS_element == NULL)
+			{
+				faulted_env->page_last_WS_element =(struct WorkingSetElement*) LIST_FIRST(&(faulted_env->page_WS_list));
+			}
 		}
-		else if (isPageReplacmentAlgorithmLRU(PG_REP_LRU_TIME_APPROX))
+		else
 		{
-			//TODO: [PROJECT'25.IM#6] FAULT HANDLER II - #2 LRU Aging Replacement
-			//Your code is here
-			//Comment the following line
-			panic("page_fault_handler().REPLACEMENT is not implemented yet...!!");
-		}
-		else if (isPageReplacmentAlgorithmModifiedCLOCK())
-		{
+			if (isPageReplacmentAlgorithmCLOCK())
+			{
+				//TODO: [PROJECT'25.IM#1] FAULT HANDLER II - #3 Clock Replacement
+				//Your code is here
+				//Comment the following line
+				//panic("page_fault_handler().REPLACEMENT is not implemented yet...!!");
+
+			    fault_va = ROUNDDOWN(fault_va, PAGE_SIZE);
+
+				uint32 wsSize = LIST_SIZE(&(faulted_env->page_WS_list));
+				struct WorkingSetElement *itwse;
+		        LIST_FOREACH_SAFE(itwse, &(faulted_env->page_WS_list), WorkingSetElement)
+				{
+		        	if (itwse->virtual_address == ROUNDDOWN(fault_va, PAGE_SIZE))
+		        	{
+						pt_set_page_permissions(faulted_env->env_page_directory, itwse->virtual_address, PERM_USED, 0);
+						return;
+		        	}
+				}
+				while (1)
+				{
+					itwse = faulted_env->page_last_WS_element;
+					uint32 perms = pt_get_page_permissions(faulted_env->env_page_directory, itwse->virtual_address);
+					if ((perms & PERM_USED) == PERM_USED)
+					{
+						pt_set_page_permissions(faulted_env->env_page_directory, itwse->virtual_address, 0, PERM_USED);
+						if (LIST_NEXT(faulted_env->page_last_WS_element) != NULL)
+							faulted_env->page_last_WS_element = LIST_NEXT(faulted_env->page_last_WS_element);
+						else
+							faulted_env->page_last_WS_element = LIST_FIRST(&(faulted_env->page_WS_list));
+					}
+					else if ((perms & PERM_USED) == 0)
+					{
+						// Replace the victim page
+						uint32 victim_va = ROUNDDOWN(itwse->virtual_address, PAGE_SIZE);
+						replacment(faulted_env, fault_va, victim_va);
+
+						// Update WS element
+						itwse->virtual_address = fault_va;
+
+						// Update page_last_WS_element to NEXT element after victim (clock hand)
+						faulted_env->page_last_WS_element = LIST_NEXT(itwse);
+						if (faulted_env->page_last_WS_element == NULL)  // Wrap around
+							faulted_env->page_last_WS_element = LIST_FIRST(&(faulted_env->page_WS_list));
+						break;
+					}
+				}
+			}
+			else if (isPageReplacmentAlgorithmLRU(PG_REP_LRU_TIME_APPROX))
+			{
+				//TODO: [PROJECT'25.IM#6] FAULT HANDLER II - #2 LRU Aging Replacement
+				//Your code is here
+
+				 struct WorkingSetElement* victim = NULL;
+						uint32 min_age = 0xFFFFFFFF;
+#if !USE_KHEAP
+
+				for (int i = 0; i < faulted_env->page_WS_max_size; i++)
+				{
+						struct WorkingSetElement* we = &faulted_env->ptr_pageWorkingSet[i];
+						if (we->empty)
+							continue;
+						if (we->time_stamp < min_age)
+						{
+							victim = we;
+							min_age = we->time_stamp;
+						}
+				}
+#else
+				struct WorkingSetElement* we;
+				LIST_FOREACH(we, &(faulted_env->page_WS_list))
+				{
+					if (we->empty)
+						continue;
+					if (we->time_stamp < min_age)
+					{
+						victim = we;
+						min_age = we->time_stamp;
+					}
+				}
+#endif
+				if (!victim) { env_exit(); return; }
+
+				uint32 victim_va = ROUNDDOWN(victim->virtual_address, PAGE_SIZE);
+
+				replacment(faulted_env,fault_va,victim_va);
+
+#if !USE_KHEAP
+
+if (victim_index != -1)
+{	faulted_env->ptr_pageWorkingSet[victim_index].empty = 0;
+	faulted_env->ptr_pageWorkingSet[victim_index].virtual_address = fault_va;
+
+	faulted_env->ptr_pageWorkingSet[victim_index].sweeps_counter = 0;
+	faulted_env->ptr_pageWorkingSet[victim_index].time_stamp = 0xFFFFFFFF;
+}
+#else
+	if (victim != NULL)
+	{
+		victim->sweeps_counter = 0;
+		victim->virtual_address = fault_va;
+		victim->time_stamp = 0xFFFFFFFF;
+
+	}
+#endif
+
+						}
+
+						//Comment the following line
+						//panic("page_fault_handler().REPLACEMENT is not implemented yet...!!");
+
+			else if (isPageReplacmentAlgorithmModifiedCLOCK())
+			{
 			//TODO: [PROJECT'25.IM#6] FAULT HANDLER II - #3 Modified Clock Replacement
 			//Your code is here
 			//Comment the following line
-			panic("page_fault_handler().REPLACEMENT is not implemented yet...!!");
+			//panic("page_fault_handler().REPLACEMENT is not implemented yet...!!");
+			fault_va = ROUNDDOWN(fault_va, PAGE_SIZE);
+
+
+			struct WorkingSetElement* victim = NULL;
+			struct WorkingSetElement* start = faulted_env->page_last_WS_element;
+
+
+			if (start == NULL)
+				start = LIST_FIRST(&(faulted_env->page_WS_list));
+
+			struct WorkingSetElement* current = start;
+
+
+			while (!victim)
+			{
+				//try1 look for u=0 and m=0
+				do
+				{
+				uint32 va = ROUNDDOWN(current->virtual_address, PAGE_SIZE);
+									            uint32 perms = pt_get_page_permissions(faulted_env->env_page_directory, va);
+
+									            // Check if u=0 and m=0
+									            if (!(perms & PERM_USED) && !(perms & PERM_MODIFIED))
+									            {
+									            victim = current;
+									                break;
+									            }
+
+									            current = LIST_NEXT(current);
+									            if (current == NULL)  //wrap around
+									                current = LIST_FIRST(&(faulted_env->page_WS_list));
+
+									        } while (current != start);
+
+									        if (victim) break;
+
+									        // try2 Look for u=0 and clear u in the way
+									        do {
+									            uint32 va = ROUNDDOWN(current->virtual_address, PAGE_SIZE);
+									            uint32 perms = pt_get_page_permissions(faulted_env->env_page_directory, va);
+
+									            if (perms & PERM_USED)
+									            {
+
+									                pt_set_page_permissions(faulted_env->env_page_directory, va, 0, PERM_USED);
+									            }
+									            else  // used=0
+									            {
+									                victim = current;
+									                break;
+									            }
+									            current = LIST_NEXT(current);
+									            if (current == NULL)  // Wrap around
+									                current = LIST_FIRST(&(faulted_env->page_WS_list));
+
+									        } while (current != start);
+
+									        // if try 2 didnt find a victim loop back to try 1
+
+									    }
+
+									    // Replace the victim page
+									    uint32 victim_va = ROUNDDOWN(victim->virtual_address, PAGE_SIZE);
+
+								        replacment(faulted_env,fault_va,victim_va);
+
+
+									    // Update WS element
+									    victim->virtual_address = fault_va;
+									    victim->sweeps_counter = 0;
+
+						//update last_page pointer to the next element after victim
+
+									    faulted_env->page_last_WS_element = LIST_NEXT(victim);
+									    if (faulted_env->page_last_WS_element == NULL)  // Wrap around
+									    	faulted_env->page_last_WS_element = LIST_FIRST(&(faulted_env->page_WS_list));
+			}
 		}
 	}
+#else
+	int iWS =faulted_env->page_last_WS_index;
+	uint32 wsSize = env_page_ws_get_size(faulted_env);
+#endif
 }
 
 void __page_fault_handler_with_buffering(struct Env * curenv, uint32 fault_va)
 {
 	panic("this function is not required...!!");
 }
-
-
-

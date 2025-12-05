@@ -34,7 +34,7 @@ int	ide_write(uint32 secno, const void *src, uint32 nsecs);
 
 #if DISK_IO_METHOD == INT_SLEEP
 struct Channel DISKchannel;				//channel of waiting for DISK
-struct spinlock DISKlock;				//spinlock to protect the DISKchannel
+struct kspinlock DISKlock;				//spinlock to protect the DISKchannel
 struct sleeplock DISKmutex;				//mutex on ide_read/write
 #elif DISK_IO_METHOD == INT_SEMAPHORE
 struct ksemaphore DISKsem;				//semaphore to manage DISK interrupts

@@ -496,7 +496,53 @@ void env_free(struct Env *e)
 	//TODO: [PROJECT'25.BONUS#4] EXIT #1 & #2 - env_free
 	//Your code is here
 	//Comment the following line
-	panic("env_free() is not implemented yet...!!");
+	//panic("env_free() is not implemented yet...!!");
+	 //env_page_ws_print(e);
+	  struct FrameInfo *pd_frame = to_frame_info(e->env_cr3);
+		    if (pd_frame != NULL)
+		    {
+		        free_frame(pd_frame);
+		    }
+
+
+
+
+	  for (int i = 0; i < __TWS_MAX_SIZE; i++)
+		    {
+		        if (e->__ptr_tws[i].empty == 0)  // If table entry is valid
+		        {
+		            uint32 table_va = ROUNDDOWN(e->__ptr_tws[i].virtual_address,PAGE_SIZE);
+
+		            // Get the page table physical address
+		            uint32 *ptr_page_table = NULL;
+		            get_page_table(e->env_page_directory, table_va, &ptr_page_table);
+
+		            if (ptr_page_table != NULL)
+		            {
+		                // Free the page table frame
+		                struct FrameInfo *table_frame = to_frame_info((uint32)ptr_page_table);
+		                free_frame(table_frame);
+
+		                // Clear the page directory entry
+		                e->env_page_directory[PDX(table_va)] = 0;
+		            }
+		        }
+		    }
+
+
+
+
+	    struct WorkingSetElement *wset = LIST_FIRST(&(e->page_WS_list));
+	    struct WorkingSetElement *nextwset;
+
+	    while(wset != NULL)
+	    {
+	        uint32 myva = ROUNDDOWN(wset->virtual_address,PAGE_SIZE);
+	        unmap_frame(e->env_page_directory, myva);  // Unmap and free the frame
+	        nextwset = LIST_NEXT(wset);
+	        kfree(wset);  // Free the WS element structure
+	        wset = nextwset;
+	    }
 
 	// [1] [NOT REQUIRED] [If BUFFERING is Enabled] Un-buffer any BUFFERED page belong to this environment from the free/modified lists
 	// [2] Free the pages in the PAGE working set from the main memory
@@ -515,7 +561,6 @@ void env_free(struct Env *e)
 	free_environment(e); /*(ALREADY DONE for you)*/ // (frees the environment (returns it back to the free environment list))
 	/*========================*/
 }
-
 //============================
 // 4) PLACE ENV IN EXIT QUEUE:
 //============================
@@ -1026,6 +1071,7 @@ void initialize_environment(struct Env* e, uint32* ptr_user_page_directory, unsi
 	{
 		LIST_INIT(&(e->page_WS_list));
 		LIST_INIT(&(e->referenceStreamList));
+        LIST_INIT(&(e->ActiveListOptimal));
 	}
 #else
 	{

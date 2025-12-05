@@ -1,8 +1,6 @@
 #include <inc/lib.h>
+#include <user/arrayOperations.h>
 
-//Functions Declarations
-void Swap(int *Elements, int First, int Second);
-void PrintElements(int *Elements, int NumOfElements);
 
 void MSort(int* A, int p, int r);
 void Merge(int* A, int p, int q, int r);
@@ -17,16 +15,27 @@ void _main(void)
 	int ret;
 
 	/*[1] GET SEMAPHORES*/
+#if USE_KERN_SEMAPHORE
+#else
 	struct semaphore ready = get_semaphore(parentenvID, "Ready");
 	struct semaphore finished = get_semaphore(parentenvID, "Finished");
+#endif
 
 	/*[2] WAIT A READY SIGNAL FROM THE MASTER*/
+#if USE_KERN_SEMAPHORE
+	char waitCmd1[64] = "__KSem@0@Wait";
+	sys_utilities(waitCmd1, 0);
+#else
 	wait_semaphore(ready);
+#endif
 
 	/*[3] GET SHARED VARs*/
 	//Get the cons_mutex ownerID
 	int* consMutexOwnerID = sget(parentenvID, "cons_mutex ownerID") ;
+#if USE_KERN_SEMAPHORE
+#else
 	struct semaphore cons_mutex = get_semaphore(*consMutexOwnerID, "Console Mutex");
+#endif
 
 	//Get the shared array & its size
 	int *numOfElements = NULL;
@@ -51,38 +60,31 @@ void _main(void)
 
 	MSort(sortedArray, 1, *numOfElements);
 
+#if USE_KERN_SEMAPHORE
+	char waitCmd2[64] = "__KSem@2@Wait";
+	sys_utilities(waitCmd2, 0);
+#else
 	wait_semaphore(cons_mutex);
+#endif
 	{
 		cprintf("Merge sort is Finished!!!!\n") ;
 		cprintf("will notify the master now...\n");
 		cprintf("Merge sort says GOOD BYE :)\n") ;
 	}
+#if USE_KERN_SEMAPHORE
+	char signalCmd1[64] = "__KSem@2@Signal";
+	sys_utilities(signalCmd1, 0);
+#else
 	signal_semaphore(cons_mutex);
+#endif
 
 	/*[5] DECLARE FINISHING*/
+#if USE_KERN_SEMAPHORE
+	char signalCmd2[64] = "__KSem@1@Signal";
+	sys_utilities(signalCmd2, 0);
+#else
 	signal_semaphore(finished);
-}
-
-void Swap(int *Elements, int First, int Second)
-{
-	int Tmp = Elements[First] ;
-	Elements[First] = Elements[Second] ;
-	Elements[Second] = Tmp ;
-}
-
-
-void PrintElements(int *Elements, int NumOfElements)
-{
-	int i ;
-	int NumsPerLine = 20 ;
-	for (i = 0 ; i < NumOfElements-1 ; i++)
-	{
-		if (i%NumsPerLine == 0)
-			cprintf("\n");
-		cprintf("%d, ",Elements[i]);
-	}
-	cprintf("%d\n",Elements[i]);
-
+#endif
 }
 
 

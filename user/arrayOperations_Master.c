@@ -1,5 +1,6 @@
 // Scenario that tests the usage of shared variables
 #include <inc/lib.h>
+#include <user/arrayOperations.h>
 
 void InitializeAscending(int *Elements, int NumOfElements);
 void InitializeDescending(int *Elements, int NumOfElements);
@@ -11,10 +12,20 @@ void
 _main(void)
 {
 	/*[1] CREATE SEMAPHORES*/
+#if USE_KERN_SEMAPHORE
+	//Initialize the kernel semaphores
+	int semVal ;
+	char initCmd1[64] = "__KSem@0@Init";
+	char initCmd2[64] = "__KSem@1@Init";
+	char initCmd3[64] = "__KSem@2@Init";
+	semVal = 0; sys_utilities(initCmd1, (uint32)(&semVal));
+	semVal = 0; sys_utilities(initCmd2, (uint32)(&semVal));
+	semVal = 1; sys_utilities(initCmd3, (uint32)(&semVal));
+#else
 	struct semaphore ready = create_semaphore("Ready", 0);
 	struct semaphore finished = create_semaphore("Finished", 0);
 	struct semaphore cons_mutex = create_semaphore("Console Mutex", 1);
-
+#endif
 	/*[2] RUN THE SLAVES PROGRAMS*/
 	int numOfSlaveProgs = 3 ;
 
@@ -40,7 +51,12 @@ _main(void)
 	int NumOfElements;
 	int *Elements = NULL;
 	//lock the console
+#if USE_KERN_SEMAPHORE
+	char waitCmd1[64] = "__KSem@2@Wait";
+	sys_utilities(waitCmd1, 0);
+#else
 	wait_semaphore(cons_mutex);
+#endif
 	{
 		cprintf("\n");
 		cprintf("!!!!!!!!!!!!!!!!!!!!!!!!!!!!\n");
@@ -69,7 +85,12 @@ _main(void)
 		} while (Chose != 'a' && Chose != 'b' && Chose != 'c');
 
 	}
+#if USE_KERN_SEMAPHORE
+	char signalCmd1[64] = "__KSem@2@Signal";
+	sys_utilities(signalCmd1, 0);
+#else
 	signal_semaphore(cons_mutex);
+#endif
 	//unlock the console
 
 	int  i ;
@@ -89,13 +110,25 @@ _main(void)
 	}
 
 	/*[4] SIGNAL READY TO THE SLAVES*/
-	for (int i = 0; i < numOfSlaveProgs; ++i) {
-		signal_semaphore(ready);
+	for (int i = 0; i < numOfSlaveProgs; ++i)
+	{
+#if USE_KERN_SEMAPHORE
+	char signalCmd2[64] = "__KSem@0@Signal";
+	sys_utilities(signalCmd2, 0);
+#else
+	signal_semaphore(ready);
+#endif
 	}
 
 	/*[5] WAIT TILL ALL SLAVES FINISHED*/
-	for (int i = 0; i < numOfSlaveProgs; ++i) {
-		wait_semaphore(finished);
+	for (int i = 0; i < numOfSlaveProgs; ++i)
+	{
+#if USE_KERN_SEMAPHORE
+	char waitCmd2[64] = "__KSem@1@Wait";
+	sys_utilities(waitCmd2, 0);
+#else
+	wait_semaphore(finished);
+#endif
 	}
 
 	/*[6] GET THEIR RESULTS*/
@@ -130,17 +163,28 @@ _main(void)
 
 	int correctMax = quicksortedArr[last];
 	int correctMed = quicksortedArr[middle];
+#if USE_KERN_SEMAPHORE
+	char waitCmd3[64] = "__KSem@2@Wait";
+	sys_utilities(waitCmd3, 0);
+#else
 	wait_semaphore(cons_mutex);
+#endif
 	{
 		//cprintf("Array is correctly sorted\n");
 		cprintf("mean = %lld, var = %lld, min = %d, max = %d, med = %d\n", *mean, *var, *min, *max, *med);
 		cprintf("mean = %lld, var = %lld, min = %d, max = %d, med = %d\n", correctMean, correctVar, correctMin, correctMax, correctMed);
 	}
+#if USE_KERN_SEMAPHORE
+	char signalCmd3[64] = "__KSem@2@Signal";
+	sys_utilities(signalCmd3, 0);
+#else
 	signal_semaphore(cons_mutex);
+#endif
+
 	if(*mean != correctMean || *var != correctVar|| *min != correctMin || *max != correctMax || *med != correctMed)
 		panic("The array STATS are NOT calculated correctly") ;
 
-	cprintf("Congratulations!! Scenario of Using the Semaphores & Shared Variables completed successfully!!\n\n\n");
+	cprintf_colored(TEXT_light_green, "Congratulations!! Scenario of Using the Semaphores & Shared Variables completed successfully!!\n\n\n");
 
 	return;
 }
@@ -168,7 +212,6 @@ void InitializeAscending(int *Elements, int NumOfElements)
 	{
 		(Elements)[i] = i ;
 	}
-
 }
 
 void InitializeDescending(int *Elements, int NumOfElements)

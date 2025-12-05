@@ -187,7 +187,7 @@ void* smalloc(char *sharedVarName, uint32 size, uint8 isWritable)
 	//==============================================================
 	//DON'T CHANGE THIS CODE========================================
 	uheap_init();
-	if (size == 0) return NULL ;
+	if (size == 0) return NULL;
 	//==============================================================
 
 	//TODO: [PROJECT'25.IM#3] SHARED MEMORY - #2 smalloc
@@ -200,7 +200,7 @@ void* smalloc(char *sharedVarName, uint32 size, uint8 isWritable)
     uint32 start = 0, end = 0;
     uint32 exact_s = 0, worst_s = 0, worst_e = 0;
     for (uint32 i = uheapPageAllocStart; i < uheapPageAllocBreak; i += PAGE_SIZE) {
-        int idx = get_idx(i);
+        uint32 idx = get_idx(i);
         if (allocs[idx].va == NULL) {
             end = i + PAGE_SIZE;
             if (start == 0) start = i;
@@ -211,8 +211,8 @@ void* smalloc(char *sharedVarName, uint32 size, uint8 isWritable)
                 else if ((end - start) > (worst_e - worst_s)) {
                     worst_s = start;
                     worst_e = end;
-        }
-    }
+                }
+            }
             start = 0;
             end = 0;
         }
@@ -238,13 +238,15 @@ void* smalloc(char *sharedVarName, uint32 size, uint8 isWritable)
         }
         page_s = uheapPageAllocBreak;
         uheapPageAllocBreak += pages_size;
-}
+    }
+
     uint32 page_e = page_s + pages_size;
     for (uint32 i = page_s; i < page_e; i += PAGE_SIZE) {
         uint32 idx = get_idx(i);
         allocs[idx].va = (void*)page_s;
         allocs[idx].size = pages_size;
-}
+    }
+
     release_uspinlock(&uheap_lk);
     int id = sys_create_shared_object(sharedVarName, size, isWritable, (void*)page_s);
     if (id < 0)
