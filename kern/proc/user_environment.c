@@ -499,7 +499,6 @@ void env_free(struct Env *e)
 	//panic("env_free() is not implemented yet...!!");
 	//env_page_ws_print(e);
 
-    delete_user_kern_stack(e);
 
 #if USE_KHEAP
 	// Free all pages in the page working set First

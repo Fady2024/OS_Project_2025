@@ -12,6 +12,7 @@
 
 //void on_clock_update_WS_time_stamps();
 extern void cleanup_buffers(struct Env* e);
+extern void delete_user_kern_stack(struct Env* e);
 //================
 
 //=================================================================================//
@@ -447,6 +448,7 @@ void sched_kill_env(uint32 envId)
 
 	if (found)
 	{
+		delete_user_kern_stack(ptr_env);
 		env_free(ptr_env);
 		cprintf("[END] DONE\n");
 	}
@@ -460,6 +462,7 @@ void sched_kill_env(uint32 envId)
 			ptr_env = cur_env;
 			assert(ptr_env->env_status == ENV_RUNNING);
 			cprintf("[BEGIN] killing a RUNNABLE environment [%d] %s...\n", ptr_env->env_id, ptr_env->prog_name);
+			delete_user_kern_stack(ptr_env);
 			env_free(ptr_env);
 			cprintf("[END] DONE\n");
 			found = 1;
@@ -569,6 +572,7 @@ void sched_kill_all()
 		{
 			cprintf("	killing[%d] %s...", ptr_env->env_id, ptr_env->prog_name);
 			sched_remove_new(ptr_env);
+			delete_user_kern_stack(ptr_env);
 			env_free(ptr_env);
 			cprintf("DONE\n");
 		}
@@ -587,6 +591,7 @@ void sched_kill_all()
 			{
 				cprintf("	killing[%d] %s...", ptr_env->env_id, ptr_env->prog_name);
 				LIST_REMOVE(&(ProcessQueues.env_ready_queues[i]), ptr_env);
+				delete_user_kern_stack(ptr_env);
 				env_free(ptr_env);
 				cprintf("DONE\n");
 			}
@@ -605,6 +610,7 @@ void sched_kill_all()
 		{
 			cprintf("	killing[%d] %s...", ptr_env->env_id, ptr_env->prog_name);
 			sched_remove_exit(ptr_env);
+			delete_user_kern_stack(ptr_env);
 			env_free(ptr_env);
 			cprintf("DONE\n");
 		}
@@ -620,6 +626,7 @@ void sched_kill_all()
 		ptr_env = cur_env;
 		assert(ptr_env->env_status == ENV_RUNNING);
 		cprintf("killing a RUNNABLE environment [%d] %s...", ptr_env->env_id, ptr_env->prog_name);
+		delete_user_kern_stack(ptr_env);
 		env_free(ptr_env);
 		cprintf("DONE\n");
 		//If it's the curenv, then reset it and reinvoke the scheduler as there's no meaning to
@@ -636,6 +643,7 @@ void sched_kill_all()
 	get_into_prompt();
 
 }
+
 
 /*2018*/
 //=================================================
