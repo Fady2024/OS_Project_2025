@@ -496,73 +496,7 @@ void env_free(struct Env *e)
 	//TODO: [PROJECT'25.BONUS#4] EXIT #1 & #2 - env_free
 	//Your code is here
 	//Comment the following line
-	//panic("env_free() is not implemented yet...!!");
-	//env_page_ws_print(e);
-
-    delete_user_kern_stack(e);
-
-#if USE_KHEAP
-	// Free all pages in the page working set First
-    struct WorkingSetElement *wset__ = LIST_FIRST(&(e->page_WS_list));
-    struct WorkingSetElement *nextwset__;
-    while (wset__ != NULL)
-    {
-        uint32 myva__ = ROUNDDOWN(wset__->virtual_address, PAGE_SIZE);
-        unmap_frame(e->env_page_directory, myva__);
-        nextwset__ = LIST_NEXT(wset__);
-        kfree(wset__);
-        wset__ = nextwset__;
-    }
-
-	// Handle ActiveList
-    struct WorkingSetElement *wset_active__ = LIST_FIRST(&(e->ActiveList));
-    struct WorkingSetElement *nextwset_active__;
-    while (wset_active__ != NULL)
-    {
-        uint32 myva__ = ROUNDDOWN(wset_active__->virtual_address, PAGE_SIZE);
-        unmap_frame(e->env_page_directory, myva__);
-        nextwset_active__ = LIST_NEXT(wset_active__);
-        kfree(wset_active__);
-        wset_active__ = nextwset_active__;
-    }
-
-    // Handle SecondList
-    struct WorkingSetElement *wset_second__ = LIST_FIRST(&(e->SecondList));
-    struct WorkingSetElement *nextwset_second__;
-    while (wset_second__ != NULL)
-    {
-        uint32 myva__ = ROUNDDOWN(wset_second__->virtual_address, PAGE_SIZE);
-        unmap_frame(e->env_page_directory, myva__);
-        nextwset_second__ = LIST_NEXT(wset_second__);
-        kfree(wset_second__);
-        wset_second__ = nextwset_second__;
-    }
-
-	// Free all page tables
-    for (int i = 0; i < __TWS_MAX_SIZE; i++)
-    {
-        if (e->__ptr_tws[i].empty == 0)
-        {
-            uint32 table_va = ROUNDDOWN(e->__ptr_tws[i].virtual_address, PAGE_SIZE);
-            uint32 *ptr_page_table = NULL;
-            get_page_table(e->env_page_directory, table_va, &ptr_page_table);
-            if (ptr_page_table != NULL)
-            {
-                struct FrameInfo *table_frame = to_frame_info(EXTRACT_ADDRESS(e->env_page_directory[PDX(table_va)]));
-                free_frame(table_frame);
-                e->env_page_directory[PDX(table_va)] = 0;
-            }
-        }
-    }
-
-    kfree(e->env_page_directory);
-
-    if (e->prepagedVAs != NULL)
-    {
-        kfree(e->prepagedVAs);
-        e->prepagedVAs = NULL;
-    }
-#endif
+	panic("env_free() is not implemented yet...!!");
 
 	// [1] [NOT REQUIRED] [If BUFFERING is Enabled] Un-buffer any BUFFERED page belong to this environment from the free/modified lists
 	// [2] Free the pages in the PAGE working set from the main memory
@@ -990,13 +924,7 @@ void* create_user_kern_stack(uint32* ptr_user_page_directory)
 		ptr_user_page_directory[PDX(guard)] = ptr_page_directory[PDX(guard)];
 	}
 
-	unmap_frame(ptr_user_page_directory,guard);
-	uint32 *pt = NULL;
-	get_page_table(ptr_user_page_directory, guard, &pt);
-	if (pt)
-	{
-		pt[PTX(guard)] = PERM_AVAILABLE;
-	}
+	pt_set_page_permissions(ptr_user_page_directory,guard,PERM_GUARD,PERM_PRESENT);
 	cprintf("FINISH\n");
 	return s;
     //allocate space for the user kernel stack.
@@ -1013,19 +941,12 @@ void delete_user_kern_stack(struct Env* e)
 #if USE_KHEAP
 	//TODO: [PROJECT'25.BONUS#4] EXIT #1 & #2 - delete_user_kern_stack
 	// Write your code here, remove the panic and write your code
-	//panic("delete_user_kern_stack() is not implemented yet...!!");
+	panic("delete_user_kern_stack() is not implemented yet...!!");
 
 	//Delete the allocated space for the user kernel stack of this process "e"
 	//remember to delete the bottom GUARD PAGE (i.e. not mapped)
 	//NEED TO FIND THE CORRECT PLACE TO CALL IT!
 	//(can't call it in env_free() since the stack is already in use during the function)
-
-	if (e->kstack != NULL)
-	{
-		kfree(e->kstack);
-		e->kstack = NULL;
-	}
-
 #else
 	panic("KERNEL HEAP is OFF! user kernel stack can't be deleted");
 #endif
@@ -1099,7 +1020,6 @@ void initialize_environment(struct Env* e, uint32* ptr_user_page_directory, unsi
 	{
 		LIST_INIT(&(e->page_WS_list));
 		LIST_INIT(&(e->referenceStreamList));
-        LIST_INIT(&(e->ActiveListOptimal));
 	}
 #else
 	{
@@ -1340,5 +1260,4 @@ void cleanup_buffers(struct Env* e)
 	//	struct freeFramesCounters ffc2 = calculate_available_frames();
 	//	cprintf("[%s] aft, mod = %d, fb = %d, fnb = %d\n",curenv->prog_name, ffc2.modified, ffc2.freeBuffered, ffc2.freeNotBuffered);
 }
-
 
