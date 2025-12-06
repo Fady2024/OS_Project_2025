@@ -537,20 +537,16 @@ void env_free(struct Env *e)
         kfree(wset_second__);
         wset_second__ = nextwset_second__;
     }
-
 	// Free all page tables
-    for (int i = 0; i < __TWS_MAX_SIZE; i++)
+	for (uint32 pdx__ = 0; pdx__ < PDX(USER_TOP); pdx__++)
     {
-        if (e->__ptr_tws[i].empty == 0)
+        if (e->env_page_directory[pdx__] & PERM_PRESENT)
         {
-            uint32 table_va = ROUNDDOWN(e->__ptr_tws[i].virtual_address, PAGE_SIZE);
-            uint32 *ptr_page_table = NULL;
-            get_page_table(e->env_page_directory, table_va, &ptr_page_table);
-            if (ptr_page_table != NULL)
+            uint32 *ptr_page_table__ = (uint32*) kheap_virtual_address(EXTRACT_ADDRESS(e->env_page_directory[pdx__]));
+            if (ptr_page_table__ != NULL)
             {
-                struct FrameInfo *table_frame = to_frame_info(EXTRACT_ADDRESS(e->env_page_directory[PDX(table_va)]));
-                free_frame(table_frame);
-                e->env_page_directory[PDX(table_va)] = 0;
+                kfree(ptr_page_table__);
+                e->env_page_directory[pdx__] = 0;
             }
         }
     }
@@ -580,6 +576,7 @@ void env_free(struct Env *e)
 	free_environment(e); /*(ALREADY DONE for you)*/ // (frees the environment (returns it back to the free environment list))
 	/*========================*/
 }
+
 
 //============================
 // 4) PLACE ENV IN EXIT QUEUE:
