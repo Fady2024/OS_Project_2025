@@ -5,7 +5,6 @@ struct alloc {
     int32 size;
 };
 struct alloc allocs[NUM_OF_UHEAP_PAGES];
-struct uspinlock uheap_lk;
 
 // ============METHODS==============
 int get_idx(uint32 i){
@@ -28,7 +27,6 @@ void uheap_init()
 		uheapPageAllocStart = dynAllocEnd + PAGE_SIZE;
 		uheapPageAllocBreak = uheapPageAllocStart;
 		__firstTimeFlag = 0;
-		init_uspinlock(&uheap_lk, "uheap", 1);
 	}
 
 }
@@ -84,8 +82,6 @@ void* malloc(uint32 size)
 		return alloc_block(size);
 	}
 
-    acquire_uspinlock(&uheap_lk);
-
 	uint32 num_pages= (size + PAGE_SIZE-1)/PAGE_SIZE , pages_size = num_pages*PAGE_SIZE;
 	uint32 start = 0,end = 0;
 	uint32 exact_s = 0,exact_e=0,worst_s=0,worst_e=0;
@@ -124,7 +120,6 @@ void* malloc(uint32 size)
 			uheapPageAllocBreak = page_e;
 		}
 		else {
-            release_uspinlock(&uheap_lk);
 			return NULL;
 		}
 
@@ -135,7 +130,6 @@ void* malloc(uint32 size)
 		allocs[idx].size = pages_size;
 	}
 	sys_allocate_user_mem(page_s,pages_size);
-    release_uspinlock(&uheap_lk);
 	return (void*)page_s;
 #else
 	panic("malloc() requires USE_KHEAP=1");
@@ -160,8 +154,6 @@ void free(void* virtual_address)
 	uint32 idx = get_idx(va);
 	uint32 size = allocs[idx].size;
 
-	acquire_uspinlock(&uheap_lk);
-
 	virtual_address = allocs[idx].va;
 	uint32 end = (int32)virtual_address + size;
 	for(uint32 i = (uint32)virtual_address;i<end; i+=PAGE_SIZE){
@@ -178,8 +170,6 @@ void free(void* virtual_address)
 
 
 	sys_free_user_mem((uint32)virtual_address,size);
-
-    release_uspinlock(&uheap_lk);
 #endif
 }
 
@@ -201,7 +191,6 @@ void* smalloc(char *sharedVarName, uint32 size, uint8 isWritable)
 	//Comment the following line
 	//panic("smalloc() is not implemented yet...!!");
 	uint32 num_pages= (size + PAGE_SIZE-1)/PAGE_SIZE , pages_size = num_pages*PAGE_SIZE;
-    acquire_uspinlock(&uheap_lk);
     uint32 start = 0, end = 0;
     uint32 exact_s = 0, worst_s = 0, worst_e = 0;
     for (uint32 i = uheapPageAllocStart; i < uheapPageAllocBreak; i += PAGE_SIZE) {
@@ -239,8 +228,7 @@ void* smalloc(char *sharedVarName, uint32 size, uint8 isWritable)
     else if (worst_s != 0)
         page_s = worst_s;
     else {
-        if (uheapPageAllocBreak + pages_size > USER_HEAP_MAX) {
-            release_uspinlock(&uheap_lk);
+		if (uheapPageAllocBreak + pages_size > USER_HEAP_MAX) {
             return NULL;
         }
         page_s = uheapPageAllocBreak;
@@ -254,7 +242,6 @@ void* smalloc(char *sharedVarName, uint32 size, uint8 isWritable)
         allocs[idx].size = pages_size;
     }
 
-    release_uspinlock(&uheap_lk);
     int id = sys_create_shared_object(sharedVarName, size, isWritable, (void*)page_s);
     if (id < 0)
         return NULL;
@@ -284,7 +271,6 @@ void* sget(int32 ownerEnvID, char *sharedVarName)
     if (size <= 0)
         return NULL;
 	uint32 num_pages= (size + PAGE_SIZE-1)/PAGE_SIZE , pages_size = num_pages*PAGE_SIZE;
-    acquire_uspinlock(&uheap_lk);
     uint32 start = 0, end = 0;
     uint32 exact_s = 0, worst_s = 0, worst_e = 0;
     for (uint32 i = uheapPageAllocStart; i < uheapPageAllocBreak; i += PAGE_SIZE) {
@@ -319,8 +305,7 @@ void* sget(int32 ownerEnvID, char *sharedVarName)
     else if (worst_s != 0)
         page_s = worst_s;
     else {
-        if (uheapPageAllocBreak + pages_size > USER_HEAP_MAX) {
-            release_uspinlock(&uheap_lk);
+		if (uheapPageAllocBreak + pages_size > USER_HEAP_MAX) {
             return NULL;
         }
         page_s = uheapPageAllocBreak;
@@ -332,7 +317,6 @@ void* sget(int32 ownerEnvID, char *sharedVarName)
         allocs[idx].va = (void*)page_s;
         allocs[idx].size = pages_size;
     }
-    release_uspinlock(&uheap_lk);
     int id = sys_get_shared_object(ownerEnvID, sharedVarName, (void*)page_s);
     if (id < 0)
         return NULL;
