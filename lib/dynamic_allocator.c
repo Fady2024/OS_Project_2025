@@ -242,11 +242,49 @@ void free_block(void *va)
 //===========================
 void *realloc_block(void* va, uint32 new_size)
 {
-	//TODO: [PROJECT'25.BONUS#2] KERNEL REALLOC - realloc_block
-	//Your code is here
-	//Comment the following line
-	panic("realloc_block() Not implemented yet");
+    //TODO: [PROJECT'25.BONUS#2] KERNEL REALLOC - realloc_block
+    //Your code is here
+    //Comment the following line
+    //    panic("realloc_block() Not implemented yet");
 
+    if (va == NULL) {
+        return alloc_block(new_size);
+    }
 
+    if (new_size == 0) {
+        free_block(va);
+        return NULL;
+    }
 
+    uint32 old_size = get_block_size(va);
+
+    if(new_size > DYN_ALLOC_MAX_BLOCK_SIZE){
+        void *ret = kamlloc(new_size);
+        if(ret) {
+            memcpy(ret, va, old_size);
+            free_block(va);
+            return ret;
+        }
+        else return va;
+    }
+
+    uint32 *new_va = alloc_block(new_size);
+    // Didn't found Size >= new_size
+    if (new_va == NULL) {
+        return (void *)va;
+    }
+
+    // Found Size >= new_size
+    uint32 size_after = get_block_size(new_va);
+    // if new_size <= old_size && i took size bigger than old_size
+    if (new_size <= old_size && size_after >= old_size) {
+        free_block(new_va);
+        return (void *)va;
+    }
+
+    uint32 min_size = (old_size < new_size ? old_size : new_size);
+
+    memcpy(new_va, va, min_size);
+    free_block(va);
+    return (void *)new_va;
 }
