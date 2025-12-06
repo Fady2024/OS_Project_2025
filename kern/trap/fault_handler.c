@@ -349,59 +349,72 @@ int get_optimal_num_faults(struct WS_List *initWorkingSet, int maxWSSize, struct
 
             if (ws_size < maxWSSize)
             {
-                // Working set not full, just add
                 struct WorkingSetElement *copywse = kmalloc(sizeof(struct WorkingSetElement));
                 copywse->virtual_address = ROUNDDOWN(itpr->virtual_address, PAGE_SIZE);
                 LIST_INSERT_TAIL(&ActiveListOptimal, copywse);
             }
             else
             {
-                // Working set is FULL - find optimal victim
-
-                struct WorkingSetElement *victim;
-                int maxDistance = -1;
-                int foundInRef = 0;
-                int distance = 0;
-
+                struct WorkingSetElement *victim = NULL;
                 struct WorkingSetElement *itwse_victim;
+
                 LIST_FOREACH(itwse_victim, &ActiveListOptimal)
                 {
+					int NOTInRef = 1;
+
                     struct PageRefElement *futureRef = LIST_NEXT(itpr);
                     while (futureRef != NULL)
                     {
-                        distance++;
-                        if (ROUNDDOWN(futureRef->virtual_address, PAGE_SIZE) == itwse_victim->virtual_address)
+                        if (ROUNDDOWN(futureRef->virtual_address, PAGE_SIZE) == ROUNDDOWN(itwse_victim->virtual_address, PAGE_SIZE))
                         {
-                            foundInRef = 1;
+                            NOTInRef = 0;
                             break;
                         }
                         futureRef = LIST_NEXT(futureRef);
                     }
 
-                    if (!foundInRef)
+                    if (NOTInRef)
                     {
                         victim = itwse_victim;
                         break;
                     }
-                    else if (maxDistance < distance)
-                    {
-                        maxDistance = distance;
-                        victim = itwse_victim;
-                    }
-
-                    foundInRef = 0;
-                	distance = 0;
                 }
+
+                if (victim == NULL)
+                {
+                    int maxDistance = -1;
+                    LIST_FOREACH(itwse_victim, &ActiveListOptimal)
+					{
+						int distance = 0;
+						struct PageRefElement *futureRef = LIST_NEXT(itpr);
+
+						while (futureRef != NULL)
+						{
+							distance++;
+							if (ROUNDDOWN(futureRef->virtual_address, PAGE_SIZE) == itwse_victim->virtual_address)
+							{
+								break;
+							}
+							futureRef = LIST_NEXT(futureRef);
+						}
+
+						if (distance > maxDistance)
+						{
+							maxDistance = distance;
+							victim = itwse_victim;
+						}
+					}
+				}
+
                 victim->virtual_address = ROUNDDOWN(itpr->virtual_address, PAGE_SIZE);
             }
         }
     }
 
-    // Clean up
     LIST_FOREACH_SAFE(itwse, &ActiveListOptimal, WorkingSetElement)
     {
         LIST_REMOVE(&ActiveListOptimal, itwse);
-        kfree(itwse);  // Don't forget to free!
+        kfree(itwse);
     }
 
     return optimal_num_faults;
@@ -595,6 +608,7 @@ void page_fault_handler(struct Env * faulted_env, uint32 fault_va)
 
 				 struct WorkingSetElement* victim = NULL;
 						uint32 min_age = 0xFFFFFFFF;
+						uint32 victim_va=0xFFFFFFFF;
 #if !USE_KHEAP
 
 				for (int i = 0; i < faulted_env->page_WS_max_size; i++)
@@ -602,28 +616,31 @@ void page_fault_handler(struct Env * faulted_env, uint32 fault_va)
 						struct WorkingSetElement* we = &faulted_env->ptr_pageWorkingSet[i];
 						if (we->empty)
 							continue;
-						if (we->time_stamp < min_age)
-						{
+					    uint32 va = ROUNDDOWN(we->virtual_address, PAGE_SIZE);
+
+						if (we->time_stamp < min_age|| (we->time_stamp == min_age && va < victim_va))
+						{victim_va=va;
 							victim = we;
 							min_age = we->time_stamp;
+
 						}
 				}
 #else
 				struct WorkingSetElement* we;
 				LIST_FOREACH(we, &(faulted_env->page_WS_list))
 				{
-					if (we->empty)
-						continue;
-					if (we->time_stamp < min_age)
-					{
+					uint32 va = ROUNDDOWN(we->virtual_address, PAGE_SIZE);
+
+					if (we->time_stamp < min_age|| (we->time_stamp == min_age && va < victim_va))
+					{victim_va=va;
 						victim = we;
 						min_age = we->time_stamp;
+
 					}
 				}
 #endif
 				if (!victim) { env_exit(); return; }
 
-				uint32 victim_va = ROUNDDOWN(victim->virtual_address, PAGE_SIZE);
 
 				replacment(faulted_env,fault_va,victim_va);
 
