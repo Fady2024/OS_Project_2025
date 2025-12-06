@@ -211,8 +211,10 @@ void* smalloc(char *sharedVarName, uint32 size, uint8 isWritable)
             if (start == 0) start = i;
         } else {
             if (end - start >= pages_size) {
-                if (end - start == pages_size)
+                if (end - start == pages_size){
                     exact_s = start;
+                    break;
+                }
                 else if ((end - start) > (worst_e - worst_s)) {
                     worst_s = start;
                     worst_e = end;
