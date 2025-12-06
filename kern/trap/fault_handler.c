@@ -609,23 +609,7 @@ void page_fault_handler(struct Env * faulted_env, uint32 fault_va)
 				 struct WorkingSetElement* victim = NULL;
 						uint32 min_age = 0xFFFFFFFF;
 						uint32 victim_va=0xFFFFFFFF;
-#if !USE_KHEAP
 
-				for (int i = 0; i < faulted_env->page_WS_max_size; i++)
-				{
-						struct WorkingSetElement* we = &faulted_env->ptr_pageWorkingSet[i];
-						if (we->empty)
-							continue;
-					    uint32 va = ROUNDDOWN(we->virtual_address, PAGE_SIZE);
-
-						if (we->time_stamp < min_age|| (we->time_stamp == min_age && va < victim_va))
-						{victim_va=va;
-							victim = we;
-							min_age = we->time_stamp;
-
-						}
-				}
-#else
 				struct WorkingSetElement* we;
 				LIST_FOREACH(we, &(faulted_env->page_WS_list))
 				{
@@ -638,22 +622,12 @@ void page_fault_handler(struct Env * faulted_env, uint32 fault_va)
 
 					}
 				}
-#endif
 				if (!victim) { env_exit(); return; }
 
 
 				replacment(faulted_env,fault_va,victim_va);
 
-#if !USE_KHEAP
 
-if (victim_index != -1)
-{	faulted_env->ptr_pageWorkingSet[victim_index].empty = 0;
-	faulted_env->ptr_pageWorkingSet[victim_index].virtual_address = fault_va;
-
-	faulted_env->ptr_pageWorkingSet[victim_index].sweeps_counter = 0;
-	faulted_env->ptr_pageWorkingSet[victim_index].time_stamp = 0xFFFFFFFF;
-}
-#else
 	if (victim != NULL)
 	{
 		victim->sweeps_counter = 0;
@@ -661,7 +635,6 @@ if (victim_index != -1)
 		victim->time_stamp = 0xFFFFFFFF;
 
 	}
-#endif
 
 						}
 
