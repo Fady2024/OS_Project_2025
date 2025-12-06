@@ -2,6 +2,8 @@
  * Minimal PIO-based (non-interrupt-driven) IDE driver code.
  * For information about what all this IDE/ATA magic means,
  * see the materials available on the class references page.
+ *
+ * 2024: INTERRUPT-based is added to the IDE driver code (el7 :))
  */
 
 #include <inc/disk.h>
@@ -20,7 +22,7 @@ static int diskno = 0;
 void disk_interrupt_handler(struct Trapframe *tf)
 {
 	int r;
-	cprintf("\n>>>>>>>> DISK INTERRUPT <<<<<<<<<\n");
+	//cprintf("\n>>>>>>>> DISK INTERRUPT <<<<<<<<<\n");
 	if (((r = inb(0x1F7)) & (IDE_BSY|IDE_DRDY)) != IDE_DRDY)
 	{
 		//cprintf("NOT READY\n");
@@ -43,7 +45,7 @@ void ide_init()
 	{
 		irq_install_handler(14, &disk_interrupt_handler);
 		init_channel(&DISKchannel, "DISK channel");
-		init_spinlock(&DISKlock, "DISK channel lock");
+		init_kspinlock(&DISKlock, "DISK channel lock");
 		init_sleeplock(&DISKmutex, "DISK mutex");
 	}
 #elif DISK_IO_METHOD == INT_SEMAPHORE
@@ -59,25 +61,37 @@ void ide_init()
 static int ide_wait_ready(bool check_error)
 {
 	int r;
+	//cprintf("ide_wait_ready: begin\n");
 
 #if DISK_IO_METHOD == PROGRAMMED_IO
 	while (((r = inb(0x1F7)) & (IDE_BSY|IDE_DRDY)) != IDE_DRDY)
 		/* do nothing */;
 #else
-	if (((r = inb(0x1F7)) & (IDE_BSY|IDE_DRDY)) != IDE_DRDY)
+	//If there's NO env (i.e. kernel in command prompt), then use PROGRAMMED-IO
+	//since there's no env to be blocked!
+	if (get_cpu_proc() == NULL)
 	{
-#if DISK_IO_METHOD == INT_SLEEP
-		//should sleep (i.e. blocked) until a IRQ14 (Primary IDE) interrupt occur
-		acquire_spinlock(&DISKlock);
-		{
-			//cprintf("\n[%d] Will be BLOCKED\n", get_cpu_proc()->env_id);
-			sleep(&DISKchannel, &DISKlock);
-		}
-		release_spinlock(&DISKlock);
-#elif DISK_IO_METHOD == INT_SEMAPHORE
-		wait_ksemaphore(&DISKsem);
+		while (((r = inb(0x1F7)) & (IDE_BSY|IDE_DRDY)) != IDE_DRDY)
+			/* do nothing */;
 	}
+	else
+	{
+		if (((r = inb(0x1F7)) & (IDE_BSY|IDE_DRDY)) != IDE_DRDY)
+		{
+#if DISK_IO_METHOD == INT_SLEEP
+			//should sleep (i.e. blocked) until a IRQ14 (Primary IDE) interrupt occur
+			//cprintf("ide_wait_ready: before acquire_kspinlock\n");
+			acquire_kspinlock(&DISKlock);
+			{
+				//cprintf("\n[%d] Will be BLOCKED\n", get_cpu_proc()->env_id);
+				sleep(&DISKchannel, &DISKlock);
+			}
+			release_kspinlock(&DISKlock);
+#elif DISK_IO_METHOD == INT_SEMAPHORE
+			wait_ksemaphore(&DISKsem);
 #endif
+		}
+	}
 #endif
 	if (check_error && (r & (IDE_DF|IDE_ERR)) != 0)
 	{
@@ -85,6 +99,8 @@ static int ide_wait_ready(bool check_error)
 		LOG_STATMENT(cprintf("ERROR @ ide_wait_ready() = %x(%d)\n",r,r););
 		return -1;
 	}
+	//cprintf("ide_wait_ready: end\n");
+
 	return 0;
 }
 
@@ -94,16 +110,19 @@ int	ide_read(uint32 secno, void *dst, uint32 nsecs)
 
 	assert(nsecs <= 256);
 
-	struct Env* e = get_cpu_proc();
-	if (e) LOG_STATMENT(cprintf("ide_read: %d before CS\n", e->env_id););
-
 	//TODODONE'24 el7: FUTURE NOTE: This BUSY-WAIT should be replaced by Interrupt to allow the OS to schedule another process till the device become ready [el7 :)]
-	/*Critical Section to ensure that the entire read/write will be completely finished*/
+	struct Env* e = get_cpu_proc();
+	/*If there's env, Critical Section to ensure that the entire read/write will be completely finished*/
+	if (e)
+	{
+		LOG_STATMENT(cprintf("ide_read: %d before CS\n", e->env_id););
+
 #if DISK_IO_METHOD == INT_SLEEP
-	acquire_sleeplock(&DISKmutex);
+		acquire_sleeplock(&DISKmutex);
 #elif DISK_IO_METHOD == INT_SEMAPHORE
-	wait_ksemaphore(&DISKmutex);
+		wait_ksemaphore(&DISKmutex);
 #endif
+	}
 	{
 		if (e) LOG_STATMENT(cprintf("ide_read: %d inside CS\n", e->env_id););
 		ide_wait_ready(0);
@@ -124,13 +143,17 @@ int	ide_read(uint32 secno, void *dst, uint32 nsecs)
 			insl(0x1F0, dst, SECTSIZE/4);
 		}
 	}
-#if DISK_IO_METHOD == INT_SLEEP
-	release_sleeplock(&DISKmutex);
-#elif DISK_IO_METHOD == INT_SEMAPHORE
-	signal_ksemaphore(&DISKmutex);
-#endif
+	/*If there's env, Exit the Critical Section */
+	if (e)
+	{
+		LOG_STATMENT(cprintf("ide_read: %d Left CS\n", e->env_id););
 
-	if (e) LOG_STATMENT(cprintf("ide_read: %d Left CS\n", e->env_id););
+#if DISK_IO_METHOD == INT_SLEEP
+		release_sleeplock(&DISKmutex);
+#elif DISK_IO_METHOD == INT_SEMAPHORE
+		signal_ksemaphore(&DISKmutex);
+#endif
+	}
 
 	return 0;
 }
@@ -143,14 +166,19 @@ int ide_write(uint32 secno, const void *src, uint32 nsecs)
 	assert(nsecs <= 256);
 
 	struct Env* e = get_cpu_proc();
-	if (e) LOG_STATMENT(cprintf("ide_write: %d before CS\n", e->env_id););
+	/*If there's env, Critical Section to ensure that the entire read/write will be completely finished*/
+	if (e)
+	{
+		LOG_STATMENT(cprintf("ide_write: %d before CS\n", e->env_id););
 
-	/*Critical Section to ensure that the entire read/write will be completely finished*/
 #if DISK_IO_METHOD == INT_SLEEP
-	acquire_sleeplock(&DISKmutex);
+		//cprintf("ide_write: before acquire_sleeplock\n");
+		acquire_sleeplock(&DISKmutex);
+		//cprintf("ide_write: after acquire_sleeplock\n");
 #elif DISK_IO_METHOD == INT_SEMAPHORE
-	wait_ksemaphore(&DISKmutex);
+		wait_ksemaphore(&DISKmutex);
 #endif
+	}
 	{
 		if (e) LOG_STATMENT(cprintf("ide_write: %d inside CS\n", e->env_id););
 
@@ -179,14 +207,17 @@ int ide_write(uint32 secno, const void *src, uint32 nsecs)
 			}
 		}
 	}
+	/*If there's env, Exit the Critical Section */
+	if (e)
+	{
 #if DISK_IO_METHOD == INT_SLEEP
-	release_sleeplock(&DISKmutex);
+		release_sleeplock(&DISKmutex);
 #elif DISK_IO_METHOD == INT_SEMAPHORE
-	signal_ksemaphore(&DISKmutex);
+		signal_ksemaphore(&DISKmutex);
 #endif
 
-	if (e) LOG_STATMENT(cprintf("ide_write: %d Left CS\n", e->env_id););
-
+		LOG_STATMENT(cprintf("ide_write: %d Left CS\n", e->env_id););
+	}
 	//LOG_STATMENT(cprintf("5\n");)
 	//cprintf("returning from ide_write \n");
 
