@@ -1090,6 +1090,7 @@ void initialize_environment(struct Env* e, uint32* ptr_user_page_directory, unsi
 	{
 		LIST_INIT(&(e->page_WS_list));
 		LIST_INIT(&(e->referenceStreamList));
+		LIST_INIT(&(e->ActiveListOptimal));
 	}
 #else
 	{
