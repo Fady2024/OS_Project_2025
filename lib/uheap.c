@@ -43,6 +43,9 @@ int get_page(void* va)
 	if (ret < 0)
 		panic("get_page() in user: failed to allocate page from the kernel");
 	return 0;
+#else
+	panic("get_page() requires USE_KHEAP=1");
+	return -1;
 #endif
 }
 
@@ -134,8 +137,10 @@ void* malloc(uint32 size)
 	sys_allocate_user_mem(page_s,pages_size);
     release_uspinlock(&uheap_lk);
 	return (void*)page_s;
+#else
+	panic("malloc() requires USE_KHEAP=1");
+	return NULL;
 #endif
-
 }
 
 //=================================
@@ -149,7 +154,7 @@ void free(void* virtual_address)
 	//Comment the following line
 	//panic("free() is not implemented yet...!!");
 	uint32 va = (uint32)virtual_address;
-	if ( va >= dynAllocStart && va < dynAllocEnd ){
+	if ( va >= dynAllocStart && va <= dynAllocEnd ){
 		return free_block(virtual_address);
 	}
 	uint32 idx = get_idx(va);
@@ -252,6 +257,9 @@ void* smalloc(char *sharedVarName, uint32 size, uint8 isWritable)
     if (id < 0)
         return NULL;
     return (void*)page_s;
+#else
+	panic("smalloc() requires USE_KHEAP=1");
+	return NULL;
 #endif
 }
 
@@ -327,8 +335,10 @@ void* sget(int32 ownerEnvID, char *sharedVarName)
     if (id < 0)
         return NULL;
     return (void*)page_s;
+#else
+	panic("sget() requires USE_KHEAP=1");
+	return NULL;
 #endif
-
 }
 
 

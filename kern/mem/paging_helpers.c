@@ -112,10 +112,10 @@ inline uint32 virtual_to_physical(uint32* directory, uint32 virtual_address)
 		if ((pte__ & PERM_PRESENT) == 0)
 			return 0;
 
-		uint32 frame_pa  = EXTRACT_ADDRESS(pte__);
-		uint32 offset = virtual_address & (PAGE_SIZE - 1);
-		uint32 PhyAd=frame_pa + offset;
-		return PhyAd;
+		uint32 frame_pa__  = EXTRACT_ADDRESS(pte__);
+		uint32 offset__ = virtual_address & (PAGE_SIZE - 1);
+		uint32 PhyAd__=frame_pa__ + offset__;
+		return PhyAd__;
 }
 
 //===============================
@@ -135,10 +135,10 @@ inline uint32 physical_to_virtual(uint32* directory, uint32 physical_address)
 
     if (PhysAddrToVirtAddr_ready && PhysAddrToVirtAddr_kheap != NULL)
     {
-        uint32 fn = PPN(physical_address);
-        if (fn < number_of_frames)
+        uint32 fn__ = PPN(physical_address);
+        if (fn__ < number_of_frames)
         {
-            uint32 base__ = PhysAddrToVirtAddr_kheap[fn];
+            uint32 base__ = PhysAddrToVirtAddr_kheap[fn__];
             if (base__ != 0)
                 return base__ + PGOFF(physical_address);
         }
