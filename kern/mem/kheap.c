@@ -57,9 +57,9 @@ int get_page(void* va)
 	if (ret < 0)
 		panic("get_page() in kern: failed to allocate page from the kernel");
 	{
-		uint32 pa = virtual_to_physical(ptr_page_directory, ROUNDDOWN((uint32)va, PAGE_SIZE));
-		if (pa != 0 && PhysAddrToVirtAddr_kheap != NULL)
-			PhysAddrToVirtAddr_kheap[PPN(pa)] = ROUNDDOWN((uint32)va, PAGE_SIZE);
+		uint32 pa__ = virtual_to_physical(ptr_page_directory, ROUNDDOWN((uint32)va, PAGE_SIZE));
+		if (pa__ != 0 && PhysAddrToVirtAddr_kheap != NULL)
+			PhysAddrToVirtAddr_kheap[PPN(pa__)] = ROUNDDOWN((uint32)va, PAGE_SIZE);
 	}
 
 	return 0;
@@ -70,9 +70,9 @@ int get_page(void* va)
 //==============================================
 void return_page(void* va)
 {
-	uint32 pa = virtual_to_physical(ptr_page_directory,ROUNDDOWN((uint32)va, PAGE_SIZE));
-	if (pa != 0 && PhysAddrToVirtAddr_kheap != NULL)
-		PhysAddrToVirtAddr_kheap[PPN(pa)] = 0;
+	uint32 physAdd__ = virtual_to_physical(ptr_page_directory,ROUNDDOWN((uint32)va, PAGE_SIZE));
+	if (physAdd__ != 0 && PhysAddrToVirtAddr_kheap != NULL)
+		PhysAddrToVirtAddr_kheap[PPN(physAdd__)] = 0;
 	unmap_frame(ptr_page_directory, ROUNDDOWN((uint32)va, PAGE_SIZE));
 }
 
@@ -208,8 +208,8 @@ unsigned int kheap_virtual_address(unsigned int physical_address)
 	//Comment the following line
 	//panic("kheap_virtual_address() is not implemented yet...!!");
     numOfKheapVACalls++;
-    uint32 va = physical_to_virtual(ptr_page_directory, physical_address);
-    return (va == 0xFFFFFFFF) ? 0 : va;
+    uint32 viradd__ = physical_to_virtual(ptr_page_directory, physical_address);
+    return (viradd__ == 0xFFFFFFFF) ? 0 : viradd__;
 		/*EFFICIENT IMPLEMENTATION ~O(1) IS REQUIRED */
 }
 

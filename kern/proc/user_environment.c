@@ -496,8 +496,73 @@ void env_free(struct Env *e)
 	//TODO: [PROJECT'25.BONUS#4] EXIT #1 & #2 - env_free
 	//Your code is here
 	//Comment the following line
-	panic("env_free() is not implemented yet...!!");
+	//panic("env_free() is not implemented yet...!!");
+	//env_page_ws_print(e);
 
+    delete_user_kern_stack(e);
+
+#if USE_KHEAP
+	// Free all pages in the page working set First
+    struct WorkingSetElement *wset__ = LIST_FIRST(&(e->page_WS_list));
+    struct WorkingSetElement *nextwset__;
+    while (wset__ != NULL)
+    {
+        uint32 myva__ = ROUNDDOWN(wset__->virtual_address, PAGE_SIZE);
+        unmap_frame(e->env_page_directory, myva__);
+        nextwset__ = LIST_NEXT(wset__);
+        kfree(wset__);
+        wset__ = nextwset__;
+    }
+
+	// Handle ActiveList
+    struct WorkingSetElement *wset_active__ = LIST_FIRST(&(e->ActiveList));
+    struct WorkingSetElement *nextwset_active__;
+    while (wset_active__ != NULL)
+    {
+        uint32 myva__ = ROUNDDOWN(wset_active__->virtual_address, PAGE_SIZE);
+        unmap_frame(e->env_page_directory, myva__);
+        nextwset_active__ = LIST_NEXT(wset_active__);
+        kfree(wset_active__);
+        wset_active__ = nextwset_active__;
+    }
+
+    // Handle SecondList
+    struct WorkingSetElement *wset_second__ = LIST_FIRST(&(e->SecondList));
+    struct WorkingSetElement *nextwset_second__;
+    while (wset_second__ != NULL)
+    {
+        uint32 myva__ = ROUNDDOWN(wset_second__->virtual_address, PAGE_SIZE);
+        unmap_frame(e->env_page_directory, myva__);
+        nextwset_second__ = LIST_NEXT(wset_second__);
+        kfree(wset_second__);
+        wset_second__ = nextwset_second__;
+    }
+
+	// Free all page tables
+    for (int i = 0; i < __TWS_MAX_SIZE; i++)
+    {
+        if (e->__ptr_tws[i].empty == 0)
+        {
+            uint32 table_va = ROUNDDOWN(e->__ptr_tws[i].virtual_address, PAGE_SIZE);
+            uint32 *ptr_page_table = NULL;
+            get_page_table(e->env_page_directory, table_va, &ptr_page_table);
+            if (ptr_page_table != NULL)
+            {
+                struct FrameInfo *table_frame = to_frame_info(EXTRACT_ADDRESS(e->env_page_directory[PDX(table_va)]));
+                free_frame(table_frame);
+                e->env_page_directory[PDX(table_va)] = 0;
+            }
+        }
+    }
+
+    kfree(e->env_page_directory);
+
+    if (e->prepagedVAs != NULL)
+    {
+        kfree(e->prepagedVAs);
+        e->prepagedVAs = NULL;
+    }
+#endif
 	// [1] [NOT REQUIRED] [If BUFFERING is Enabled] Un-buffer any BUFFERED page belong to this environment from the free/modified lists
 	// [2] Free the pages in the PAGE working set from the main memory
 	// [3] free the PAGE working set itself from the main memory
@@ -925,7 +990,6 @@ void* create_user_kern_stack(uint32* ptr_user_page_directory)
 	}
 
 	pt_set_page_permissions(ptr_user_page_directory,guard,PERM_GUARD,PERM_PRESENT);
-	cprintf("FINISH\n");
 	return s;
     //allocate space for the user kernel stack.
     //remember to leave its bottom page as a GUARD PAGE (i.e. not mapped)
@@ -941,7 +1005,13 @@ void delete_user_kern_stack(struct Env* e)
 #if USE_KHEAP
 	//TODO: [PROJECT'25.BONUS#4] EXIT #1 & #2 - delete_user_kern_stack
 	// Write your code here, remove the panic and write your code
-	panic("delete_user_kern_stack() is not implemented yet...!!");
+	//panic("delete_user_kern_stack() is not implemented yet...!!");
+
+		if (e->kstack != NULL)
+	{
+		kfree(e->kstack);
+		e->kstack = NULL;
+	}
 
 	//Delete the allocated space for the user kernel stack of this process "e"
 	//remember to delete the bottom GUARD PAGE (i.e. not mapped)

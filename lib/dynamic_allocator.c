@@ -258,15 +258,15 @@ void *realloc_block(void* va, uint32 new_size)
 
     uint32 old_size = get_block_size(va);
 
-    if(new_size > DYN_ALLOC_MAX_BLOCK_SIZE){
-        void *ret = kamlloc(new_size);
-        if(ret) {
-            memcpy(ret, va, old_size);
-            free_block(va);
-            return ret;
-        }
-        else return va;
-    }
+//    if(new_size > DYN_ALLOC_MAX_BLOCK_SIZE){
+//        void *ret = kmalloc(new_size);
+//        if(ret) {
+//            memcpy(ret, va, old_size);
+//            free_block(va);
+//            return ret;
+//        }
+//        else return va;
+//    }
 
     uint32 *new_va = alloc_block(new_size);
     // Didn't found Size >= new_size
